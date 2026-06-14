@@ -37,6 +37,7 @@ app.use("/api/requests", require("./routes/requestRoutes"));
 app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 app.use("/api/search", require("./routes/searchRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
+app.use("/api/calls", require("./routes/callLogRoutes"));
 
 app.use(errorHandler);
 
