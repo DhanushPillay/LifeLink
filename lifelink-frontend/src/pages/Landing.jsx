@@ -4,7 +4,6 @@ import LandingNavbar from '../components/layout/LandingNavbar';
 import DonorCard from '../components/ui/DonorCard';
 import ContactModal from '../components/ui/ContactModal';
 import { useLocation } from '../context/LocationContext';
-import { searchDonors } from '../data/mockDonors';
 import { BLOOD_GROUPS, ORGANS } from '../utils/helpers';
 import '../components/layout/Landing.css';
 
@@ -39,7 +38,7 @@ export default function Landing() {
     }
   };
 
-  const handleSearch = (e) => {
+  const handleSearch = async (e) => {
     e?.preventDefault();
     
     let currentLat = location.lat;
@@ -58,13 +57,23 @@ export default function Landing() {
 
     const type = detectSearchType(query);
     setSearchType(type);
-    const res = searchDonors({
-      type,
-      query: query.trim(),
-      lat: currentLat,
-      lng: currentLng,
-    });
-    setResults(res);
+
+    try {
+      const token = localStorage.getItem('lifelink_token');
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch(`/api/search?type=${type}&query=${encodeURIComponent(query.trim())}&lat=${currentLat}&lng=${currentLng}`, {
+        headers
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setResults(data);
+      }
+    } catch (err) {
+      console.error('Search failed:', err);
+    }
   };
 
   const detectSearchType = (q) => {

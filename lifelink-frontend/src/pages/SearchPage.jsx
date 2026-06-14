@@ -5,7 +5,6 @@ import DonorCard from '../components/ui/DonorCard';
 import ContactModal from '../components/ui/ContactModal';
 import { useLocation } from '../context/LocationContext';
 import { useAuth } from '../context/AuthContext';
-import { searchDonors } from '../data/mockDonors';
 import { BLOOD_GROUPS, ORGANS } from '../utils/helpers';
 
 export default function SearchPage() {
@@ -24,14 +23,22 @@ export default function SearchPage() {
     runSearch('');
   }, [type, location]);
 
-  const runSearch = (q) => {
-    const res = searchDonors({
-      type,
-      query: q,
-      lat: location.lat,
-      lng: location.lng,
-    }).filter((d) => !blockedIds.includes(d.id));
-    setResults(res);
+  const runSearch = async (q) => {
+    try {
+      const token = localStorage.getItem('lifelink_token');
+      if (!token) return;
+      const res = await fetch(`/api/search?type=${type}&query=${encodeURIComponent(q)}&lat=${location.lat}&lng=${location.lng}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setResults(data.filter((d) => !blockedIds.includes(d.id || d._id)));
+      }
+    } catch (err) {
+      console.error('Search failed:', err);
+    }
   };
 
   const handleSearch = (e) => {

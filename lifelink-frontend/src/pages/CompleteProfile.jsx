@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from '../context/LocationContext';
 import { BLOOD_GROUPS, ORGANS, calculateAge } from '../utils/helpers';
 import './Auth.css';
 
 export default function CompleteProfile() {
   const { completeProfile } = useAuth();
+  const { location } = useLocation();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -93,7 +95,7 @@ export default function CompleteProfile() {
     setDonateOrgan(false);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
       setError('Name is required');
@@ -108,7 +110,7 @@ export default function CompleteProfile() {
       return;
     }
 
-    completeProfile({
+    await completeProfile({
       name: name.trim(),
       dob,
       age,
@@ -125,6 +127,10 @@ export default function CompleteProfile() {
       eligibilityFileName,
       eligibilityFileType,
       eligibilityStatus: eligibilityFileName ? 'processing' : 'none',
+      lat: location.lat,
+      lng: location.lng,
+      city: location.city,
+      pincode: location.pincode,
     });
     navigate('/dashboard');
   };
