@@ -1,234 +1,359 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEY = 'lifelink_auth';
-const USERS_KEY = 'lifelink_users';
-const CALLS_KEY = 'lifelink_calls';
-const NOTIFS_KEY = 'lifelink_notifications';
-const BLOCKED_KEY = 'lifelink_blocked';
-
-function loadJSON(key, fallback) {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveJSON(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
-}
+const TOKEN_KEY = 'lifelink_token';
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => loadJSON(STORAGE_KEY, null));
-  const [callLogs, setCallLogs] = useState(() => loadJSON(CALLS_KEY, []));
-  const [notifications, setNotifications] = useState(() => loadJSON(NOTIFS_KEY, []));
-  const [blockedIds, setBlockedIds] = useState(() => loadJSON(BLOCKED_KEY, []));
-  const timerRef = useRef(null);
+  const [user, setUser] = useState(null);
+  const [callLogs, setCallLogs] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [blockedIds, setBlockedIds] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) saveJSON(STORAGE_KEY, user);
-    else localStorage.removeItem(STORAGE_KEY);
-  }, [user]);
+  // Helper to fetch data after login/boot
+  const loadUserData = useCallback(async (token) => {
+    try {
+      const headers = { 'Authorization': `Bearer ${token}` };
 
-  useEffect(() => {
-    saveJSON(CALLS_KEY, callLogs);
-  }, [callLogs]);
+      // Fetch profile
+      const userRes = await fetch('/api/auth/me', { headers });
+      if (!userRes.ok) throw new Error('Failed to load user profile');
+      const userData = await userRes.json();
+      setUser(userData.user);
+      setBlockedIds(userData.user.blockedIds || []);
 
-  useEffect(() => {
-    saveJSON(NOTIFS_KEY, notifications);
-  }, [notifications]);
-
-  useEffect(() => {
-    saveJSON(BLOCKED_KEY, blockedIds);
-  }, [blockedIds]);
-
-  useEffect(() => {
-    const hasProcessing = user?.profile?.eligibilityStatus === 'processing';
-    if (hasProcessing && !timerRef.current) {
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        const users = loadJSON(USERS_KEY, []);
-        const currentUser = loadJSON(STORAGE_KEY, null);
-        if (!currentUser) return;
-        const idx = users.findIndex((u) => u.id === currentUser.id);
-        if (idx !== -1) {
-          const fileName = currentUser.profile?.eligibilityFileName || '';
-          const isSuccess = !/fail|invalid/i.test(fileName);
-          const nextStatus = isSuccess ? 'verified' : 'failed';
-          
-          const updatedProfile = {
-            ...users[idx].profile,
-            eligibilityStatus: nextStatus,
-          };
-          
-          // If failed, automatically turn off donor switches
-          if (!isSuccess) {
-            updatedProfile.donateBlood = false;
-            updatedProfile.donateOrgan = false;
-          }
-          
-          users[idx].profile = updatedProfile;
-          
-          saveJSON(USERS_KEY, users);
-          setUser({ ...users[idx] });
-          
-          // Generate notification
-          const notif = {
-            id: `n_${Date.now()}`,
-            read: false,
-            timestamp: new Date().toISOString(),
-            title: isSuccess ? 'Eligibility Verified' : 'Verification Failed',
-            message: isSuccess 
-              ? 'Your medical eligibility certificate has been verified. You can now toggle donor availability.'
-              : 'Medical certificate verification failed. Click here to re-upload.',
-            type: isSuccess ? 'success' : 'error',
-            redirect: '/dashboard/settings#eligibility'
-          };
-          
-          setNotifications((prev) => {
-            const updated = [notif, ...prev];
-            saveJSON(NOTIFS_KEY, updated);
-            return updated;
-          });
-        }
-      }, 7000);
-    }
-    
-    return () => {
-      if (!hasProcessing && timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
+      // Fetch call logs
+      const callsRes = await fetch('/api/calls', { headers });
+      if (callsRes.ok) {
+        const callsData = await callsRes.json();
+        setCallLogs(callsData);
       }
-    };
-  }, [user?.profile?.eligibilityStatus, user?.profile?.eligibilityFileName, user?.id, notifications]);
 
-  const getUsers = () => loadJSON(USERS_KEY, []);
-
-  const signUp = useCallback(({ email, phone, password }) => {
-    const users = getUsers();
-    if (users.find((u) => u.email === email)) {
-      return { success: false, error: 'Email already registered' };
+      // Fetch notifications
+      const notifsRes = await fetch('/api/notifications', { headers });
+      if (notifsRes.ok) {
+        const notifsData = await notifsRes.json();
+        setNotifications(notifsData);
+      }
+    } catch (err) {
+      console.error('Error loading user data:', err);
+      // Clear invalid token
+      localStorage.removeItem(TOKEN_KEY);
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
-    if (users.find((u) => u.phone === phone)) {
-      return { success: false, error: 'Phone number already registered' };
-    }
-    const newUser = {
-      id: `u_${Date.now()}`,
-      email,
-      phone,
-      password,
-      profileComplete: false,
-      profile: {},
-      createdAt: new Date().toISOString(),
-    };
-    saveJSON(USERS_KEY, [...users, newUser]);
-    return { success: true };
   }, []);
 
-  const login = useCallback(({ identifier, password }) => {
-    const users = getUsers();
-    const found = users.find(
-      (u) =>
-        (u.email === identifier || u.phone === identifier) &&
-        u.password === password
-    );
-    if (!found) return { success: false, error: 'Invalid credentials' };
-    setUser(found);
-    return { success: true, user: found };
+  // Check auth status on app start
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      loadUserData(token);
+    } else {
+      setLoading(false);
+    }
+  }, [loadUserData]);
+
+  // Poll for certificate verification status changes
+  useEffect(() => {
+    let intervalId = null;
+    const token = localStorage.getItem(TOKEN_KEY);
+
+    if (token && user?.profile?.eligibilityStatus === 'processing') {
+      intervalId = setInterval(async () => {
+        try {
+          const headers = { 'Authorization': `Bearer ${token}` };
+          const res = await fetch('/api/auth/me', { headers });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user?.profile?.eligibilityStatus !== 'processing') {
+              setUser(data.user);
+              // Fetch latest notifications to get the verification status alert
+              const notifsRes = await fetch('/api/notifications', { headers });
+              if (notifsRes.ok) {
+                const notifsData = await notifsRes.json();
+                setNotifications(notifsData);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error polling status:', err);
+        }
+      }, 2000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [user?.profile?.eligibilityStatus]);
+
+  const signUp = useCallback(async ({ email, phone, password }) => {
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, phone, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.message || 'Registration failed' };
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: 'Network error occurred' };
+    }
   }, []);
+
+  const login = useCallback(async ({ identifier, password }) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.message || 'Invalid credentials' };
+      }
+      
+      localStorage.setItem(TOKEN_KEY, data.token);
+      await loadUserData(data.token);
+      
+      return { success: true, user: data.user };
+    } catch (err) {
+      return { success: false, error: 'Network error occurred' };
+    }
+  }, [loadUserData]);
 
   const logout = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
     setUser(null);
-  }, []);
-
-  const resetPassword = useCallback(({ identifier, newPassword }) => {
-    const users = getUsers();
-    const idx = users.findIndex(
-      (u) => u.email === identifier || u.phone === identifier
-    );
-    if (idx === -1) return { success: false, error: 'Account not found' };
-    users[idx].password = newPassword;
-    saveJSON(USERS_KEY, users);
-    return { success: true };
-  }, []);
-
-  const completeProfile = useCallback((profileData) => {
-    const users = getUsers();
-    const idx = users.findIndex((u) => u.id === user.id);
-    if (idx === -1) return;
-    users[idx].profile = profileData;
-    users[idx].profileComplete = true;
-    saveJSON(USERS_KEY, users);
-    setUser({ ...users[idx] });
-  }, [user]);
-
-  const updateProfile = useCallback((profileData) => {
-    const users = getUsers();
-    const idx = users.findIndex((u) => u.id === user.id);
-    if (idx === -1) return;
-    users[idx].profile = { ...users[idx].profile, ...profileData };
-    saveJSON(USERS_KEY, users);
-    setUser({ ...users[idx] });
-  }, [user]);
-
-  const deleteAccount = useCallback(({ password }) => {
-    if (user.password !== password) {
-      return { success: false, error: 'Incorrect password' };
-    }
-    const users = getUsers();
-    const filtered = users.filter((u) => u.id !== user.id);
-    saveJSON(USERS_KEY, filtered);
-    setUser(null);
-    return { success: true };
-  }, [user]);
-
-  const addCallLog = useCallback((call) => {
-    const entry = {
-      id: `call_${Date.now()}`,
-      ...call,
-      timestamp: new Date().toISOString(),
-    };
-    setCallLogs((prev) => [entry, ...prev]);
-    return entry;
-  }, []);
-
-  const deleteCallLog = useCallback((id) => {
-    setCallLogs((prev) => prev.filter((c) => c.id !== id));
-  }, []);
-
-  const blockDonor = useCallback((donorId) => {
-    setBlockedIds((prev) => [...new Set([...prev, donorId])]);
-  }, []);
-
-  const unblockDonor = useCallback((donorId) => {
-    setBlockedIds((prev) => prev.filter((id) => id !== donorId));
-  }, []);
-
-  const addNotification = useCallback((notif) => {
-    const entry = {
-      id: `n_${Date.now()}`,
-      read: false,
-      timestamp: new Date().toISOString(),
-      ...notif,
-    };
-    setNotifications((prev) => [entry, ...prev]);
-  }, []);
-
-  const markNotificationRead = useCallback((id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
-  }, []);
-
-  const markAllNotificationsRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
-
-  const clearNotifications = useCallback(() => {
+    setCallLogs([]);
     setNotifications([]);
+    setBlockedIds([]);
+  }, []);
+
+  const resetPassword = useCallback(async ({ identifier, newPassword }) => {
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.message || 'Failed to reset password' };
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: 'Network error occurred' };
+    }
+  }, []);
+
+  const completeProfile = useCallback(async (profileData) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data.user);
+      }
+    } catch (err) {
+      console.error('Error completing profile:', err);
+    }
+  }, []);
+
+  const updateProfile = useCallback(async (profileData) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data.user);
+      }
+    } catch (err) {
+      console.error('Error updating profile:', err);
+    }
+  }, []);
+
+  const deleteAccount = useCallback(async ({ password }) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return { success: false, error: 'Unauthorized' };
+    try {
+      const res = await fetch('/api/auth/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.message || 'Failed to delete account' };
+      }
+      logout();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: 'Network error occurred' };
+    }
+  }, [logout]);
+
+  const addCallLog = useCallback(async (call) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return null;
+    try {
+      const res = await fetch('/api/calls', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(call),
+      });
+      if (res.ok) {
+        const entry = await res.json();
+        setCallLogs((prev) => [entry, ...prev]);
+        return entry;
+      }
+    } catch (err) {
+      console.error('Error adding call log:', err);
+    }
+    return null;
+  }, []);
+
+  const deleteCallLog = useCallback(async (id) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/calls/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        setCallLogs((prev) => prev.filter((c) => c._id !== id && c.id !== id));
+      }
+    } catch (err) {
+      console.error('Error deleting call log:', err);
+    }
+  }, []);
+
+  const blockDonor = useCallback(async (donorId) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/auth/block/${donorId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedIds(data.blockedIds);
+      }
+    } catch (err) {
+      console.error('Error blocking donor:', err);
+    }
+  }, []);
+
+  const unblockDonor = useCallback(async (donorId) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/auth/unblock/${donorId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedIds(data.blockedIds);
+      }
+    } catch (err) {
+      console.error('Error unblocking donor:', err);
+    }
+  }, []);
+
+  const addNotification = useCallback(() => {
+    // Notifications are database-driven from backend updates now
+  }, []);
+
+  const markNotificationRead = useCallback(async (id) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n._id === id || n.id === id ? { ...n, read: true } : n))
+        );
+      }
+    } catch (err) {
+      console.error('Error marking notification read:', err);
+    }
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch('/api/notifications/read-all', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      }
+    } catch (err) {
+      console.error('Error marking all notifications read:', err);
+    }
+  }, []);
+
+  const clearNotifications = useCallback(async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        setNotifications([]);
+      }
+    } catch (err) {
+      console.error('Error clearing notifications:', err);
+    }
   }, []);
 
   return (
@@ -255,9 +380,10 @@ export function AuthProvider({ children }) {
         markNotificationRead,
         markAllNotificationsRead,
         clearNotifications,
+        loading
       }}
     >
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
