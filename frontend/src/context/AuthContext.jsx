@@ -1,95 +1,63 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { supabase } from '../api/supabase';
+import api from '../api/axios';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
+    // Restore session from localStorage
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setUser(parsed);
+      } catch {
+        localStorage.removeItem('user');
       }
-    };
-
-    getSession();
-
-    // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
+    }
+    setLoading(false);
   }, []);
 
-  const fetchProfile = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-        
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+    const { data } = await api.post('/auth/login', {
+      identifier: email,
       password,
     });
-    if (error) throw error;
-    return data;
+    if (data.success) {
+      const userData = { ...data.user, token: data.token };
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return data;
+    }
+    throw new Error('Login failed');
   };
 
-  const register = async ({ email, password, fullName, role }) => {
-    // Pass extra metadata so the DB trigger can create the profile
-    const { data, error } = await supabase.auth.signUp({
+  const register = async ({ fullName, email, password, role, phone }) => {
+    const { data } = await api.post('/auth/register', {
       email,
+      phone: phone || '0000000000',
       password,
-      options: {
-        data: {
-          full_name: fullName,
-          role: role
-        }
-      }
     });
-    if (error) throw error;
-    return data;
+    if (data.success) {
+      const userData = { ...data.user, token: data.token };
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return data;
+    }
+    throw new Error('Registration failed');
   };
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
     setUser(null);
-    setProfile(null);
+    localStorage.removeItem('user');
   };
 
   const value = {
     user,
-    profile,
+    profile: user,
     loading,
     login,
     register,
