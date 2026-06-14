@@ -101,10 +101,10 @@ export default function Settings() {
     }
   };
 
-  const handleDeleteAccount = (e) => {
+  const handleDeleteAccount = async (e) => {
     e.preventDefault();
     setDeleteError('');
-    const result = deleteAccount({ password: deletePassword });
+    const result = await deleteAccount({ password: deletePassword });
     if (!result.success) {
       setDeleteError(result.error);
       return;
@@ -131,10 +131,18 @@ export default function Settings() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleSaveLocation = (e) => {
+  const handleSaveLocation = async (e) => {
     e.preventDefault();
     if (pincode.length === 6) {
-      setPincode(pincode);
+      const loc = setPincode(pincode);
+      await updateProfile({
+        lat: loc.lat,
+        lng: loc.lng,
+        city: loc.city,
+        pincode: loc.pincode
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     }
   };
 
