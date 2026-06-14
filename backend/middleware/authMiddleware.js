@@ -19,6 +19,11 @@ const protect = asyncHandler(async (req, res, next) => {
       // Get user from the token
       req.user = await User.findById(decoded.id).select("-password");
 
+      if (!req.user) {
+        res.status(401);
+        throw new Error("Not authorized, user not found");
+      }
+
       next();
     } catch (error) {
       console.error(error);
@@ -33,6 +38,22 @@ const protect = asyncHandler(async (req, res, next) => {
   }
 });
 
+const optionalProtect = asyncHandler(async (req, res, next) => {
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    try {
+      const token = req.headers.authorization.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = await User.findById(decoded.id).select("-password");
+    } catch (error) {
+      console.error("Optional JWT verification failed:", error.message);
+    }
+  }
+  next();
+});
+
 // Role check middleware
 const role = (...roles) => {
   return (req, res, next) => {
@@ -44,4 +65,4 @@ const role = (...roles) => {
   };
 };
 
-module.exports = { protect, role };
+module.exports = { protect, optionalProtect, role };
