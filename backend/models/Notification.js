@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["match", "emergency", "info", "success", "error"],
+      enum: ["match", "emergency", "info", "success", "error", "call"],
       default: "info",
     },
     redirect: {
