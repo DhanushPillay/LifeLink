@@ -36,19 +36,19 @@ export default function Notifications() {
           <div className="notif-list">
             {notifications.map((notif) => (
               <div
-                key={notif.id}
+                key={notif._id}
                 className={`notif-item ${!notif.read ? 'notif-item-unread' : ''}`}
-                onClick={() => markNotificationRead(notif.id)}
+                onClick={() => markNotificationRead(notif._id)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && markNotificationRead(notif.id)}
+                onKeyDown={(e) => e.key === 'Enter' && markNotificationRead(notif._id)}
               >
                 {!notif.read && <div className="notif-dot" />}
                 <div className="notif-content" style={{ flex: 1 }}>
                   <h4>{notif.title}</h4>
                   <p>{notif.message}</p>
                   <div className="notif-time">
-                     {formatDate(notif.timestamp)} · {formatTime(notif.timestamp)}
+                     {formatDate(notif.createdAt)} · {formatTime(notif.createdAt)}
                   </div>
                 </div>
               </div>

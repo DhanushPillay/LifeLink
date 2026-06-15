@@ -15,6 +15,8 @@ export default function SearchPage() {
   const [results, setResults] = useState([]);
   const [contactDonor, setContactDonor] = useState(null);
   const [showContact, setShowContact] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const isBlood = type === 'blood';
   const chips = isBlood ? BLOOD_GROUPS : ORGANS;
@@ -31,8 +33,10 @@ export default function SearchPage() {
     }
     const controller = new AbortController();
     abortRef.current = controller;
+    setLoading(true);
+    setError('');
     try {
-      const { data } = await api.get('/search/donors', {
+      const { data } = await api.get('/search', {
         params: {
           type,
           query: q,
@@ -41,13 +45,16 @@ export default function SearchPage() {
         },
         signal: controller.signal
       });
-      const res = data.filter((d) => !blockedIds.includes(d.id));
+      const res = data.filter((d) => !blockedIds.includes(String(d.id || d._id)));
       setResults(res);
     } catch (err) {
       if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
         console.error('Error fetching donors:', err);
+        setError('Failed to search donors. Please try again.');
         setResults([]);
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -98,7 +105,22 @@ export default function SearchPage() {
           ))}
         </div>
 
-        {results.length === 0 ? (
+        {loading ? (
+          <div className="empty-state glass">
+            <div className="empty-state-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5, animation: 'spin 1s linear infinite' }}>
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+            <p>Searching for donors...</p>
+          </div>
+        ) : error ? (
+          <div className="empty-state glass">
+            <p style={{ color: 'var(--primary)' }}>{error}</p>
+            <button className="btn btn-outline btn-sm" onClick={() => runSearch(query)} style={{ marginTop: 12 }}>Retry</button>
+          </div>
+        ) : results.length === 0 ? (
           <div className="empty-state glass">
             <div className="empty-state-icon">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
@@ -116,7 +138,7 @@ export default function SearchPage() {
             <div className="results-grid">
               {results.map((donor) => (
                 <DonorCard
-                  key={donor.id}
+                  key={donor.id || donor._id}
                   donor={donor}
                   type={type}
                   onContact={handleContact}

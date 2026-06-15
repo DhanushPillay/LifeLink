@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const Request = require("../models/Request");
 const Donor = require("../models/Donor");
 const Hospital = require("../models/Hospital");
+const User = require("../models/User");
 const Notification = require("../models/Notification");
 const sendEmail = require("../utils/sendEmail");
 
@@ -140,8 +141,81 @@ const updateRequest = asyncHandler(async (req, res) => {
   res.json(updatedRequest);
 });
 
+// @desc    Create a donor request (any authenticated user)
+// @route   POST /api/requests/donor
+// @access  Private
+const createDonorRequest = asyncHandler(async (req, res) => {
+  const { requestType, bloodGroup, organType, units, city, isEmergency, urgencyLevel } = req.body;
+
+  if (!requestType) {
+    res.status(400);
+    throw new Error("Request type is required");
+  }
+
+  const userCity = city || req.user.profile?.city || "Unknown";
+
+  let request = await Request.create({
+    requestType,
+    bloodGroup,
+    organType,
+    units: units || 1,
+    city: userCity,
+    status: "Pending",
+    isEmergency: isEmergency || false,
+    urgencyLevel: urgencyLevel || "medium",
+    requestedBy: req.user._id,
+  });
+
+  // Find matching donors from User model
+  const matchQuery = {
+    profileComplete: true,
+    "profile.lat": { $exists: true },
+    "profile.lng": { $exists: true },
+  };
+
+  if (requestType === "blood") {
+    matchQuery["profile.bloodGroup"] = bloodGroup;
+    matchQuery["profile.donateBlood"] = true;
+  } else if (requestType === "organ") {
+    matchQuery["profile.donateOrgan"] = true;
+    matchQuery["profile.organs"] = { $in: [organType] };
+  }
+
+  const matchingUsers = await User.find(matchQuery).select("_id email");
+
+  // Notify matching donors
+  for (const matchedUser of matchingUsers) {
+    if (matchedUser._id.toString() === req.user._id.toString()) continue;
+
+    await Notification.create({
+      user: matchedUser._id,
+      title: isEmergency ? "EMERGENCY Request Near You!" : "New Donation Request",
+      message: `A ${requestType} donation request${bloodGroup ? ` for ${bloodGroup}` : ""}${organType ? ` (${organType})` : ""} has been posted in ${userCity}.`,
+      type: isEmergency ? "emergency" : "match",
+      redirect: "/dashboard",
+    });
+
+    if (matchedUser.email) {
+      try {
+        await sendEmail({
+          email: matchedUser.email,
+          subject: isEmergency
+            ? `EMERGENCY: ${requestType} donation needed in ${userCity}`
+            : `New ${requestType} donation request in ${userCity}`,
+          message: `A ${requestType} donation request has been posted in ${userCity}. Log in to LIFELINK to view details and respond.`,
+        });
+      } catch (e) {
+        // Email send failure is non-critical
+      }
+    }
+  }
+
+  res.status(201).json(request);
+});
+
 module.exports = {
   createRequest,
+  createDonorRequest,
   getRequests,
   updateRequest
 };

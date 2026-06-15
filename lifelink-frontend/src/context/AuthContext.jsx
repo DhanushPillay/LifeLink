@@ -3,51 +3,17 @@ import api from '../api/axios';
 
 const AuthContext = createContext(null);
 
-const USER_KEY = 'lifelink_user';
 const TOKEN_KEY = 'lifelink_token';
-const CALLS_KEY = 'lifelink_calls';
-const NOTIFS_KEY = 'lifelink_notifications';
-const BLOCKED_KEY = 'lifelink_blocked';
-
-function loadJSON(key, fallback) {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveJSON(key, data) {
-  if (data === null) {
-    localStorage.removeItem(key);
-  } else {
-    localStorage.setItem(key, JSON.stringify(data));
-  }
-}
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => loadJSON(USER_KEY, null));
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [loading, setLoading] = useState(true);
 
-  const [callLogs, setCallLogs] = useState(() => loadJSON(CALLS_KEY, []));
-  const [notifications, setNotifications] = useState(() => loadJSON(NOTIFS_KEY, []));
-  const [blockedIds, setBlockedIds] = useState(() => loadJSON(BLOCKED_KEY, []));
+  const [callLogs, setCallLogs] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [blockedIds, setBlockedIds] = useState([]);
 
-  useEffect(() => {
-    saveJSON(CALLS_KEY, callLogs);
-  }, [callLogs]);
-
-  useEffect(() => {
-    saveJSON(NOTIFS_KEY, notifications);
-  }, [notifications]);
-
-  useEffect(() => {
-    saveJSON(BLOCKED_KEY, blockedIds);
-  }, [blockedIds]);
-
-  // Sync token to localStorage
   useEffect(() => {
     if (token) {
       localStorage.setItem(TOKEN_KEY, token);
@@ -56,24 +22,27 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-  // Sync user to localStorage
+  // Fetch profile, notifications, and call logs on load
   useEffect(() => {
-    saveJSON(USER_KEY, user);
-  }, [user]);
-
-  // Fetch the MongoDB profile from the backend on load if we have a token
-  useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchAll = async () => {
       if (!token) {
         setLoading(false);
         return;
       }
       try {
         const { data } = await api.get('/auth/me');
-        setUser(data);
+        const userData = data.user || data;
+        setUser(userData);
+        setBlockedIds(userData.blockedIds || []);
+
+        const [notifsRes, callsRes] = await Promise.all([
+          api.get('/notifications').catch(() => ({ data: [] })),
+          api.get('/calls').catch(() => ({ data: [] })),
+        ]);
+        setNotifications(notifsRes.data || []);
+        setCallLogs(callsRes.data || []);
       } catch (err) {
-        console.error('Error fetching user profile:', err);
-        // If token is invalid, clear it
+        console.error('Error fetching profile:', err);
         if (err.response?.status === 401) {
           setToken(null);
           setUser(null);
@@ -82,17 +51,18 @@ export function AuthProvider({ children }) {
         setLoading(false);
       }
     };
-    fetchProfile();
+    fetchAll();
   }, [token]);
 
   // ── Auth: Sign Up ──────────────────────────────────
   const signUp = useCallback(async ({ email, phone, password }) => {
     try {
       const { data } = await api.post('/auth/register', { email, phone, password });
-      const { token: _, ...userData } = data;
+      const userData = data.user || data;
       setUser(userData);
       setToken(data.token);
-      return { success: true };
+      setBlockedIds(userData.blockedIds || []);
+      return { success: true, user: userData };
     } catch (err) {
       return { success: false, error: err.response?.data?.message || err.message };
     }
@@ -102,9 +72,18 @@ export function AuthProvider({ children }) {
   const login = useCallback(async ({ identifier, password }) => {
     try {
       const { data } = await api.post('/auth/login', { identifier, password });
-      const { token: _, ...userData } = data;
+      const userData = data.user || data;
       setUser(userData);
       setToken(data.token);
+      setBlockedIds(userData.blockedIds || []);
+
+      const [notifsRes, callsRes] = await Promise.all([
+        api.get('/notifications').catch(() => ({ data: [] })),
+        api.get('/calls').catch(() => ({ data: [] })),
+      ]);
+      setNotifications(notifsRes.data || []);
+      setCallLogs(callsRes.data || []);
+
       return { success: true, user: userData };
     } catch (err) {
       return { success: false, error: err.response?.data?.message || err.message };
@@ -115,18 +94,19 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem(USER_KEY);
+    setCallLogs([]);
+    setNotifications([]);
+    setBlockedIds([]);
     localStorage.removeItem(TOKEN_KEY);
   }, []);
 
   // ── Auth: Reset Password ───────────────────────────
   const resetPassword = useCallback(async ({ identifier, newPassword }) => {
     try {
-      // In a real app, this would hit an endpoint like /api/auth/reset-password
-      // We'll just fake success here for UI purposes since it's not fully implemented on backend
+      await api.post('/auth/reset-password', { identifier, newPassword });
       return { success: true };
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: err.response?.data?.message || err.message };
     }
   }, []);
 
@@ -134,7 +114,7 @@ export function AuthProvider({ children }) {
   const completeProfile = useCallback(async (profileData) => {
     try {
       const { data } = await api.put('/auth/profile', profileData);
-      setUser(data);
+      setUser(data.user || data);
       return { success: true };
     } catch (err) {
       console.error('Failed to complete profile:', err);
@@ -146,7 +126,7 @@ export function AuthProvider({ children }) {
   const updateProfile = useCallback(async (profileData) => {
     try {
       const { data } = await api.put('/auth/profile', profileData);
-      setUser(data);
+      setUser(data.user || data);
       return { success: true };
     } catch (err) {
       console.error('Failed to update profile:', err);
@@ -157,60 +137,93 @@ export function AuthProvider({ children }) {
   // ── Account: Delete Account ────────────────────────
   const deleteAccount = useCallback(async ({ password }) => {
     try {
+      await api.post('/auth/delete', { password });
       logout();
       return { success: true };
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: err.response?.data?.message || err.message };
     }
   }, [logout]);
 
-  // ── Call Logs (kept in localStorage for now) ───────
-  const addCallLog = useCallback((call) => {
+  // ── Call Logs (backend API) ────────────────────────
+  const addCallLog = useCallback(async (call) => {
+    try {
+      const { data } = await api.post('/calls', call);
+      setCallLogs((prev) => [data, ...prev]);
+      return data;
+    } catch (err) {
+      console.error('Failed to add call log:', err);
+      return null;
+    }
+  }, []);
+
+  const deleteCallLog = useCallback(async (id) => {
+    try {
+      await api.delete(`/calls/${id}`);
+      setCallLogs((prev) => prev.filter((c) => c._id !== id && c.id !== id));
+    } catch (err) {
+      console.error('Failed to delete call log:', err);
+    }
+  }, []);
+
+  // ── Blocked Donors (backend API) ───────────────────
+  const blockDonor = useCallback(async (donorId) => {
+    try {
+      const { data } = await api.post(`/auth/block/${donorId}`);
+      setBlockedIds(data.blockedIds || [...blockedIds, donorId]);
+    } catch (err) {
+      console.error('Failed to block donor:', err);
+    }
+  }, [blockedIds]);
+
+  const unblockDonor = useCallback(async (donorId) => {
+    try {
+      const { data } = await api.post(`/auth/unblock/${donorId}`);
+      setBlockedIds(data.blockedIds || blockedIds.filter((id) => id !== donorId));
+    } catch (err) {
+      console.error('Failed to unblock donor:', err);
+    }
+  }, [blockedIds]);
+
+  // ── Notifications (backend API) ────────────────────
+  const addNotification = useCallback(async (notif) => {
+    // Notifications are created server-side; this is for optimistic local display
     const entry = {
-      id: `call_${Date.now()}`,
-      ...call,
-      timestamp: new Date().toISOString(),
-    };
-    setCallLogs((prev) => [entry, ...prev]);
-    return entry;
-  }, []);
-
-  const deleteCallLog = useCallback((id) => {
-    setCallLogs((prev) => prev.filter((c) => c.id !== id));
-  }, []);
-
-  // ── Blocked Donors (kept in localStorage) ──────────
-  const blockDonor = useCallback((donorId) => {
-    setBlockedIds((prev) => [...new Set([...prev, donorId])]);
-  }, []);
-
-  const unblockDonor = useCallback((donorId) => {
-    setBlockedIds((prev) => prev.filter((id) => id !== donorId));
-  }, []);
-
-  // ── Notifications (kept in localStorage) ───────────
-  const addNotification = useCallback((notif) => {
-    const entry = {
-      id: `n_${Date.now()}`,
+      _id: `n_${Date.now()}`,
       read: false,
-      timestamp: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       ...notif,
     };
     setNotifications((prev) => [entry, ...prev]);
   }, []);
 
-  const markNotificationRead = useCallback((id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+  const markNotificationRead = useCallback(async (id) => {
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === id ? { ...n, read: true } : n))
+      );
+    } catch (err) {
+      console.error('Failed to mark notification read:', err);
+    }
   }, []);
 
-  const markAllNotificationsRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const markAllNotificationsRead = useCallback(async () => {
+    try {
+      await api.post('/notifications/read-all');
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (err) {
+      console.error('Failed to mark all read:', err);
+    }
   }, []);
 
-  const clearNotifications = useCallback(() => {
-    setNotifications([]);
+  const clearNotifications = useCallback(async () => {
+    try {
+      await api.delete('/notifications');
+      setNotifications([]);
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
+    }
   }, []);
 
   return (

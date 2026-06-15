@@ -42,7 +42,7 @@ export default function CallLogs() {
         ) : (
           <div className="call-list">
             {callLogs.map((call) => (
-              <div key={call.id} className="call-item">
+              <div key={call._id} className="call-item">
                 <div className="call-item-icon" style={{ background: call.direction === 'incoming' ? 'rgba(13, 148, 136, 0.08)' : 'var(--primary-light)', color: call.direction === 'incoming' ? '#0d9488' : 'var(--primary)' }}>
                   {call.direction === 'incoming' ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -87,7 +87,7 @@ export default function CallLogs() {
                   <button
                     className="btn btn-sm"
                     style={{ background: 'rgba(15, 23, 42, 0.05)', color: 'var(--black)' }}
-                    onClick={() => deleteCallLog(call.id)}
+                    onClick={() => deleteCallLog(call._id)}
                   >
                     Delete
                   </button>
