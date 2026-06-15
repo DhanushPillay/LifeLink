@@ -1,3 +1,10 @@
+/**
+ * @file helpers.js
+ * @description General utility helpers for age calculation, date/time formatting, phone masking, and distance checks.
+ * @author KrishBansod99
+ * @reviewed Reviewed and documented by KrishBansod99 for code maintainability.
+ */
+
 export function calculateAge(dob) {
   if (!dob) return null;
   const birth = new Date(dob);
