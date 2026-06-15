@@ -1,3 +1,10 @@
+/**
+ * @file notificationController.js
+ * @description Controller layer for reading, marking, and clearing user notifications.
+ * @author KrishBansod99
+ * @reviewed Reviewed and documented by KrishBansod99 for code maintainability.
+ */
+
 const asyncHandler = require("express-async-handler");
 const Notification = require("../models/Notification");
 
