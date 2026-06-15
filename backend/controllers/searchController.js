@@ -41,16 +41,13 @@ const searchNearbyDonors = asyncHandler(async (req, res) => {
 const searchDonors = asyncHandler(async (req, res) => {
   const { type, query, lat, lng } = req.query;
 
-  // Find all completed profiles
-  const users = await User.find({ profileComplete: true }).select("-password");
+  const users = await User.find({ profileComplete: true }).select("-password -phone -email -profile.eligibilityFile -profile.pincode");
   
   let results = users.map(u => ({
     id: u._id,
-    email: u.email,
-    phone: u.phone,
     ...u.profile,
-    lat: u.location?.lat,
-    lng: u.location?.lng,
+    lat: u.profile?.lat,
+    lng: u.profile?.lng,
     available: u.profile?.donateBlood || u.profile?.donateOrgan || false
   }));
 
@@ -58,25 +55,24 @@ const searchDonors = asyncHandler(async (req, res) => {
     results = results.filter((d) => d.donateBlood && d.available);
     if (query) {
       results = results.filter(
-        (d) => d.bloodGroup.toLowerCase() === query.toLowerCase()
+        (d) => d.bloodGroup && d.bloodGroup.toLowerCase() === query.toLowerCase()
       );
     }
   } else if (type === 'organ') {
     results = results.filter((d) => d.donateOrgan && d.available);
     if (query) {
       results = results.filter((d) =>
-        d.organs.some((o) => o.toLowerCase().includes(query.toLowerCase()))
+        d.organs && d.organs.some((o) => o.toLowerCase().includes(query.toLowerCase()))
       );
     }
   }
 
-  // Haversine sorting
   if (lat && lng) {
     const latN = Number(lat);
     const lngN = Number(lng);
     
     const haversine = (lat1, lng1, lat2, lng2) => {
-      if (!lat1 || !lng1) return Infinity; // Put those without location at end
+      if (!lat1 || !lng1) return Infinity;
       const R = 6371;
       const dLat = ((lat2 - lat1) * Math.PI) / 180;
       const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -99,4 +95,19 @@ const searchDonors = asyncHandler(async (req, res) => {
   res.json(results);
 });
 
-module.exports = { searchNearbyDonors, searchDonors };
+const getDonorById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const user = await User.findById(id).select("-password -phone -email -profile.eligibilityFile -profile.pincode");
+  if (!user) {
+    res.status(404);
+    throw new Error("Donor not found");
+  }
+  res.json({
+    id: user._id,
+    ...user.profile,
+    lat: user.profile?.lat,
+    lng: user.profile?.lng,
+  });
+});
+
+module.exports = { searchNearbyDonors, searchDonors, getDonorById };

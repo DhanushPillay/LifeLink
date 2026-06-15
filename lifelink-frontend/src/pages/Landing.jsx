@@ -5,6 +5,7 @@ import DonorCard from '../components/ui/DonorCard';
 import ContactModal from '../components/ui/ContactModal';
 import { useLocation } from '../context/LocationContext';
 import { BLOOD_GROUPS, ORGANS } from '../utils/helpers';
+import api from '../api/axios';
 import '../components/layout/Landing.css';
 
 export default function Landing() {
@@ -59,18 +60,15 @@ export default function Landing() {
     setSearchType(type);
 
     try {
-      const token = localStorage.getItem('lifelink_token');
-      const headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      const res = await fetch(`/api/search?type=${type}&query=${encodeURIComponent(query.trim())}&lat=${currentLat}&lng=${currentLng}`, {
-        headers
+      const { data } = await api.get('/search', {
+        params: {
+          type,
+          query: query.trim(),
+          lat: currentLat,
+          lng: currentLng,
+        },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data);
-      }
+      setResults(data);
     } catch (err) {
       console.error('Search failed:', err);
     }
@@ -190,7 +188,7 @@ export default function Landing() {
               <div className="landing-results-grid">
                 {results.slice(0, 6).map((donor) => (
                   <DonorCard
-                    key={donor.id}
+                    key={donor.id || donor._id}
                     donor={donor}
                     type={searchType}
                     onContact={handleContact}
