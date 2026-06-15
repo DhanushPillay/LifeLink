@@ -16,7 +16,7 @@ const requestSchema = new mongoose.Schema(
 
     hospital: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
+      required: false,
       ref: "Hospital",
     },
 
@@ -46,6 +46,12 @@ const requestSchema = new mongoose.Schema(
       type: String,
       enum: ["low", "medium", "high", "critical"],
       default: "medium"
+    },
+
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
     }
   },
   { timestamps: true }

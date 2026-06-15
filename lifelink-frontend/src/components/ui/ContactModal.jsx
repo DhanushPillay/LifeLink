@@ -41,7 +41,9 @@ export default function ContactModal({ isOpen, onClose, donor, type }) {
 
   if (!donor) return null;
 
-  if (blockedIds.includes(donor.id)) {
+  const donorId = donor.id || donor._id;
+
+  if (blockedIds.includes(donorId)) {
     return (
       <Modal isOpen={isOpen} onClose={handleClose} title="Contact Unavailable">
         <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
@@ -70,7 +72,7 @@ export default function ContactModal({ isOpen, onClose, donor, type }) {
 
     setTimeout(() => {
       addCallLog({
-        donorId: donor.id,
+        donorId: donorId,
         type,
         direction: 'outgoing',
         bloodGroup: donor.bloodGroup,
@@ -102,7 +104,7 @@ export default function ContactModal({ isOpen, onClose, donor, type }) {
     setCalling(true);
     setTimeout(() => {
       addCallLog({
-        donorId: donor.id,
+        donorId: donorId,
         type,
         direction: 'outgoing',
         bloodGroup: donor.bloodGroup,

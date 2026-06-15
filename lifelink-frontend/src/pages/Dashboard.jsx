@@ -1,19 +1,65 @@
-/**
- * @file Dashboard.jsx
- * @description Main dashboard landing page showing donor statistics, recent activities, and search entries.
- * @author KrishBansod99
- * @reviewed Reviewed and documented by KrishBansod99 for code maintainability.
- */
-
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { BLOOD_GROUPS, ORGANS } from '../utils/helpers';
+import Modal from '../components/ui/Modal';
+import api from '../api/axios';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, callLogs, notifications } = useAuth();
+  const [stats, setStats] = useState({ totalDonors: 0, activeRequests: 0, successfulMatches: 0, registeredHospitals: 0 });
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestType, setRequestType] = useState('blood');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [organType, setOrganType] = useState('');
+  const [isEmergency, setIsEmergency] = useState(false);
+  const [requestError, setRequestError] = useState('');
+  const [requestSuccess, setRequestSuccess] = useState(false);
 
   const recentCalls = callLogs.slice(0, 3);
   const unreadNotifs = notifications.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    api.get('/dashboard/stats')
+      .then(({ data }) => setStats(data))
+      .catch(() => {});
+  }, []);
+
+  const handleCreateRequest = async (e) => {
+    e.preventDefault();
+    setRequestError('');
+    setRequestSuccess(false);
+
+    if (requestType === 'blood' && !bloodGroup) {
+      setRequestError('Select a blood group');
+      return;
+    }
+    if (requestType === 'organ' && !organType) {
+      setRequestError('Select an organ type');
+      return;
+    }
+
+    try {
+      await api.post('/requests/donor', {
+        requestType,
+        bloodGroup: requestType === 'blood' ? bloodGroup : undefined,
+        organType: requestType === 'organ' ? organType : undefined,
+        isEmergency,
+        urgencyLevel: isEmergency ? 'critical' : 'medium',
+      });
+      setRequestSuccess(true);
+      setBloodGroup('');
+      setOrganType('');
+      setIsEmergency(false);
+      setTimeout(() => {
+        setShowRequestModal(false);
+        setRequestSuccess(false);
+      }, 1500);
+    } catch (err) {
+      setRequestError(err.response?.data?.message || 'Failed to create request');
+    }
+  };
 
   return (
     <>
@@ -73,7 +119,7 @@ export default function Dashboard() {
             <p>Connect instantly with nearby donors of any blood group</p>
             <span className="btn btn-outline btn-sm" style={{ marginTop: 'auto', border: '1px solid rgba(225, 29, 72, 0.25)', color: 'var(--primary)' }}>Search Blood Groups &rarr;</span>
           </button>
-          
+
           <button
             className="action-card action-card-organ"
             onClick={() => navigate('/dashboard/search/organ')}
@@ -112,23 +158,46 @@ export default function Dashboard() {
             <p>Locate registered emergency kidney, liver, or cornea donors</p>
             <span className="btn btn-outline btn-sm" style={{ marginTop: 'auto', border: '1px solid rgba(13, 148, 136, 0.25)', color: '#0d9488' }}>Search Organ Donors &rarr;</span>
           </button>
+
+          <button
+            className="action-card"
+            style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.15)' }}
+            onClick={() => setShowRequestModal(true)}
+          >
+            <div className="action-card-img-wrapper">
+              <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="requestGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#f59e0b" />
+                    <stop offset="100%" stopColor="#d97706" />
+                  </linearGradient>
+                </defs>
+                <circle cx="32" cy="32" r="26" fill="url(#requestGrad)" />
+                <line x1="32" y1="20" x2="32" y2="44" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                <line x1="20" y1="32" x2="44" y2="32" stroke="white" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h3>Create Request</h3>
+            <p>Post a blood or organ request and notify matching donors</p>
+            <span className="btn btn-outline btn-sm" style={{ marginTop: 'auto', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#d97706' }}>Create New Request &rarr;</span>
+          </button>
         </div>
 
         <div className="dashboard-analytics" style={{ marginTop: 8 }}>
           <div className="analytics-card">
             <h4>Blood Search Activity</h4>
-            <div className="stat-card-value" style={{ fontSize: '1.5rem', marginBottom: 0 }}>412</div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 600 }}>Requests matching your area today</p>
+            <div className="stat-card-value" style={{ fontSize: '1.5rem', marginBottom: 0 }}>{stats.activeRequests}</div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 600 }}>Active requests in your area</p>
             <div className="analytics-bar">
-              <div className="analytics-bar-fill" style={{ width: '68%', background: 'var(--primary)' }}></div>
+              <div className="analytics-bar-fill" style={{ width: `${Math.min(stats.activeRequests * 2, 100)}%`, background: 'var(--primary)' }}></div>
             </div>
           </div>
           <div className="analytics-card">
             <h4>Organ Donor Matches</h4>
-            <div className="stat-card-value" style={{ fontSize: '1.5rem', marginBottom: 0 }}>94</div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 600 }}>Active emergency shields near you</p>
+            <div className="stat-card-value" style={{ fontSize: '1.5rem', marginBottom: 0 }}>{stats.successfulMatches}</div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 600 }}>Successful matches so far</p>
             <div className="analytics-bar">
-              <div className="analytics-bar-fill" style={{ width: '42%', background: '#0d9488' }}></div>
+              <div className="analytics-bar-fill" style={{ width: `${Math.min(stats.successfulMatches * 5, 100)}%`, background: '#0d9488' }}></div>
             </div>
           </div>
           <div className="analytics-card">
@@ -138,7 +207,7 @@ export default function Dashboard() {
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No recent calls</p>
               ) : (
                 recentCalls.map((call) => (
-                  <p key={call.id} style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <p key={call._id} style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: call.type === 'blood' ? 'var(--primary)' : '#0d9488' }}></span>
                     {call.bloodGroup} donor · {call.city}
                   </p>
@@ -148,6 +217,81 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <Modal isOpen={showRequestModal} onClose={() => setShowRequestModal(false)} title="Create Donation Request">
+        {requestSuccess ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>✓</div>
+            <p style={{ fontWeight: 500, color: 'var(--green-dark)' }}>Request Created Successfully</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 8 }}>Matching donors have been notified.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleCreateRequest}>
+            <div className="form-group">
+              <label className="form-label">Request Type</label>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${requestType === 'blood' ? 'btn-primary' : 'btn-glass'}`}
+                  onClick={() => setRequestType('blood')}
+                  style={{ flex: 1 }}
+                >
+                  Blood
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${requestType === 'organ' ? 'btn-primary' : 'btn-glass'}`}
+                  onClick={() => setRequestType('organ')}
+                  style={{ flex: 1 }}
+                >
+                  Organ
+                </button>
+              </div>
+            </div>
+
+            {requestType === 'blood' && (
+              <div className="form-group">
+                <label className="form-label">Blood Group *</label>
+                <select className="form-input" value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} required>
+                  <option value="">Select blood group</option>
+                  {BLOOD_GROUPS.map((bg) => (
+                    <option key={bg} value={bg}>{bg}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {requestType === 'organ' && (
+              <div className="form-group">
+                <label className="form-label">Organ Type *</label>
+                <select className="form-input" value={organType} onChange={(e) => setOrganType(e.target.value)} required>
+                  <option value="">Select organ</option>
+                  {ORGANS.map((o) => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="toggle-row" style={{ marginBottom: 16 }}>
+              <div className="toggle-row-info">
+                <h4>Emergency Request</h4>
+                <p>Notify all matching donors immediately</p>
+              </div>
+              <label className="toggle">
+                <input type="checkbox" checked={isEmergency} onChange={(e) => setIsEmergency(e.target.checked)} />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+
+            {requestError && <p className="form-error">{requestError}</p>}
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }}>
+              Post Request
+            </button>
+          </form>
+        )}
+      </Modal>
     </>
   );
 }
