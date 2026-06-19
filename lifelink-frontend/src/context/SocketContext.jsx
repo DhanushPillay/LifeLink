@@ -27,12 +27,12 @@ export function SocketProvider({ children }) {
 
     const s = io(serverUrl, {
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
-      reconnectionDelayMax: 10000,
-      timeout: 10000,
+      reconnectionAttempts: 30,
+      reconnectionDelay: 3000,
+      reconnectionDelayMax: 15000,
+      timeout: 60000,
     });
 
     s.on('connect', () => {
