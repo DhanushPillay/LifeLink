@@ -17,6 +17,8 @@ if (!process.env.MONGO_URI || !process.env.JWT_SECRET) {
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 // Security HTTP headers
 app.use(helmet());
 
