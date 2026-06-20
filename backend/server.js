@@ -48,6 +48,8 @@ app.use("/api/notifications", require("./routes/notificationRoutes"));
 app.use("/api/calls", require("./routes/callLogRoutes"));
 app.use("/api/chat", require("./routes/chatRoutes"));
 
+initSSE(app);
+
 app.use((req, res, next) => {
   res.status(404);
   const error = new Error(`Route Not Found - ${req.originalUrl}`);
@@ -58,7 +60,6 @@ app.use(errorHandler);
 
 const server = http.createServer(app);
 
-initSSE(app);
 initFirebase();
 
 const PORT = process.env.PORT || 5000;
