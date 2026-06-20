@@ -5,7 +5,7 @@ const Hospital = require("../models/Hospital");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const sendEmail = require("../utils/sendEmail");
-const { isUserOnline, emitToUser, emitToAll } = require("../socket");
+const { isUserOnline, emitToUser, emitToAll } = require("../sse");
 const { sendPushNotification } = require("../utils/push");
 
 // @desc    Create a new donation request

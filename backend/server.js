@@ -5,7 +5,7 @@ const dotenv = require("dotenv");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const { errorHandler } = require("./middleware/errorMiddleware");
-const { initSocket } = require("./socket");
+const { initSSE } = require("./sse");
 const { initFirebase } = require("./utils/push");
 
 dotenv.config();
@@ -58,7 +58,7 @@ app.use(errorHandler);
 
 const server = http.createServer(app);
 
-initSocket(server);
+initSSE(app);
 initFirebase();
 
 const PORT = process.env.PORT || 5000;
