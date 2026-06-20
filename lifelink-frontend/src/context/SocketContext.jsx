@@ -27,8 +27,6 @@ export function SocketProvider({ children }) {
 
     const s = io(serverUrl, {
       auth: { token },
-      transports: ['polling'],
-      upgrade: false,
       reconnection: true,
       reconnectionAttempts: 30,
       reconnectionDelay: 3000,
