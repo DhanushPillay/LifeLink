@@ -47,6 +47,9 @@ export default function SignUp() {
       setError(result.error);
       return;
     }
+
+    alert("Account created successfully!");
+
     if (!result.user.profileComplete) {
       navigate('/complete-profile');
     } else {
