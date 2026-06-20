@@ -47,7 +47,11 @@ export default function SignUp() {
       setError(result.error);
       return;
     }
-    navigate('/dashboard');
+    if (!result.user.profileComplete) {
+      navigate('/complete-profile');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   return (
@@ -143,7 +147,11 @@ export default function SignUp() {
                 setError(result.error);
                 return;
               }
-              navigate('/dashboard');
+              if (!result.user.profileComplete) {
+                navigate('/complete-profile');
+              } else {
+                navigate('/dashboard');
+              }
             }}
             onError={() => setError('Google sign-in failed. Please try again.')}
             theme="outline"
