@@ -17,6 +17,7 @@ export default function Login() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,11 +27,16 @@ export default function Login() {
       setError(result.error);
       return;
     }
-    if (!result.user.profileComplete) {
-      navigate('/complete-profile');
-    } else {
-      navigate('/dashboard');
-    }
+    
+    setShowSuccess(true);
+
+    setTimeout(() => {
+      if (!result.user.profileComplete) {
+        navigate('/complete-profile');
+      } else {
+        navigate('/dashboard');
+      }
+    }, 2000);
   };
 
   return (
@@ -118,11 +124,14 @@ export default function Login() {
                 setError(result.error);
                 return;
               }
-              if (!result.user.profileComplete) {
-                navigate('/complete-profile');
-              } else {
-                navigate('/dashboard');
-              }
+              setShowSuccess(true);
+              setTimeout(() => {
+                if (!result.user.profileComplete) {
+                  navigate('/complete-profile');
+                } else {
+                  navigate('/dashboard');
+                }
+              }, 2000);
             }}
             onError={() => setError('Google sign-in failed. Please try again.')}
             theme="outline"
@@ -145,6 +154,15 @@ export default function Login() {
           </Link>
         </p>
       </div>
+      {showSuccess && (
+        <div className="success-modal-overlay">
+          <div className="success-modal">
+            <div className="success-icon">✓</div>
+            <h3>Login Successful!</h3>
+            <p>Welcome back to LifeLink. Redirecting...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
