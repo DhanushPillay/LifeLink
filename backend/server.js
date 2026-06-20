@@ -30,7 +30,9 @@ const limiter = rateLimit({
 app.use("/api", limiter);
 
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+  origin: function (origin, callback) {
+    callback(null, true); // Dynamically allow any origin for development
+  },
   credentials: true,
 }));
 app.use(express.json());
