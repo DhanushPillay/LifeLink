@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -27,9 +27,10 @@ function ProtectedRoute({ children }) {
 
 function PublicOnlyRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
+  const [initialAuth] = useState(isAuthenticated);
 
   if (loading) return null;
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  if (initialAuth) return <Navigate to="/dashboard" replace />;
   return children;
 }
 
