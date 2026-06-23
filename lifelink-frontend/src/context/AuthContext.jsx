@@ -286,6 +286,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
+        token,
         loading,
         isAuthenticated: !!user,
         profileComplete: user?.profileComplete ?? false,
