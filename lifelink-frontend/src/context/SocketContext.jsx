@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import api from '../api/axios';
 
@@ -10,86 +10,90 @@ export function SocketProvider({ children }) {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const esRef = useRef(null);
   const listenersRef = useRef(new Map());
+  const reconnectTimerRef = useRef(null);
+  const retryCountRef = useRef(0);
 
-  useEffect(() => {
-    if (!token || !user) {
-      if (esRef.current) {
-        esRef.current.close();
-        esRef.current = null;
+  const dispatch = useCallback((event, data) => {
+    const handlers = listenersRef.current.get(event);
+    if (handlers) {
+      for (const handler of handlers) {
+        try { handler(data); } catch (e) { console.error('Handler error', e); }
       }
-      setConnected(false);
-      setOnlineUsers([]);
-      return;
+    }
+  }, []);
+
+  const connect = useCallback(() => {
+    if (!token || !user) return;
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
     }
 
-    const serverUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : 'https://blood-and-organ-donar-matching-system.onrender.com');
-    const url = `${serverUrl}/api/stream?token=${token}`;
+    const serverUrl =
+      import.meta.env.VITE_API_URL ||
+      (import.meta.env.DEV
+        ? 'http://localhost:5000'
+        : 'https://blood-and-organ-donar-matching-system.onrender.com');
+
+    const url = `${serverUrl}/api/stream?token=${encodeURIComponent(token)}`;
+    console.log('[SSE] Connecting to', url);
 
     const es = new EventSource(url);
     esRef.current = es;
 
-    const dispatch = (event, data) => {
-      const handlers = listenersRef.current.get(event);
-      if (handlers) {
-        for (const handler of handlers) {
-          handler(data);
-        }
-      }
-    };
-
     es.addEventListener('connect', () => {
-      console.log('SSE connected');
+      console.log('[SSE] Connected');
       setConnected(true);
+      retryCountRef.current = 0;
     });
 
     es.addEventListener('online-users', (e) => {
       try { setOnlineUsers(JSON.parse(e.data)); } catch {}
     });
 
-    es.addEventListener('new-notification', (e) => {
-      try { dispatch('new-notification', JSON.parse(e.data)); } catch {}
-    });
-
-    es.addEventListener('new-request', (e) => {
-      try { dispatch('new-request', JSON.parse(e.data)); } catch {}
-    });
-
-    es.addEventListener('receive-message', (e) => {
-      try { dispatch('receive-message', JSON.parse(e.data)); } catch {}
-    });
-
-    es.addEventListener('message-sent', (e) => {
-      try { dispatch('message-sent', JSON.parse(e.data)); } catch {}
-    });
-
-    es.addEventListener('chat-error', (e) => {
-      try { dispatch('chat-error', JSON.parse(e.data)); } catch {}
-    });
-
-    es.addEventListener('user-typing', (e) => {
-      try { dispatch('user-typing', JSON.parse(e.data)); } catch {}
-    });
-
-    es.addEventListener('user-stop-typing', (e) => {
-      try { dispatch('user-stop-typing', JSON.parse(e.data)); } catch {}
-    });
-
-    es.addEventListener('messages-read', (e) => {
-      try { dispatch('messages-read', JSON.parse(e.data)); } catch {}
+    const forwardEvents = [
+      'new-notification', 'new-request',
+      'receive-message', 'message-sent', 'chat-error',
+      'user-typing', 'user-stop-typing', 'messages-read',
+    ];
+    forwardEvents.forEach((evt) => {
+      es.addEventListener(evt, (e) => {
+        try { dispatch(evt, JSON.parse(e.data)); } catch {}
+      });
     });
 
     es.onerror = () => {
-      console.log('SSE connection error / reconnecting');
+      console.log('[SSE] Error / disconnected');
       setConnected(false);
-    };
-
-    return () => {
       es.close();
       esRef.current = null;
+
+      // Exponential back-off: 2s, 4s, 8s, … max 30s
+      const delay = Math.min(2000 * Math.pow(2, retryCountRef.current), 30000);
+      retryCountRef.current += 1;
+      console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${retryCountRef.current})`);
+      reconnectTimerRef.current = setTimeout(connect, delay);
+    };
+  }, [token, user, dispatch]);
+
+  useEffect(() => {
+    if (!token || !user) {
+      if (esRef.current) { esRef.current.close(); esRef.current = null; }
+      clearTimeout(reconnectTimerRef.current);
+      setConnected(false);
+      setOnlineUsers([]);
+      retryCountRef.current = 0;
+      return;
+    }
+    connect();
+    return () => {
+      clearTimeout(reconnectTimerRef.current);
+      if (esRef.current) { esRef.current.close(); esRef.current = null; }
       setConnected(false);
     };
-  }, [token, user]);
+  }, [token, user, connect]);
 
+  // socket shim – same API as before so Chat.jsx doesn't need changes
   const socket = useRef({
     _handlers: new Map(),
     on(event, handler) {
@@ -114,10 +118,7 @@ export function SocketProvider({ children }) {
       }
     },
     disconnect() {
-      if (esRef.current) {
-        esRef.current.close();
-        esRef.current = null;
-      }
+      if (esRef.current) { esRef.current.close(); esRef.current = null; }
     },
   }).current;
 
