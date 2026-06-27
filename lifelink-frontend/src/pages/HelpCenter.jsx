@@ -1,4 +1,7 @@
+import { useState } from 'react';
+
 export default function HelpCenter() {
+  const [openFaq, setOpenFaq] = useState(null);
   const faqs = [
     {
       q: 'How does secure masked calling work?',
@@ -43,13 +46,56 @@ export default function HelpCenter() {
 
         <div className="settings-section">
           <h3>Frequently Asked Questions</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 12 }}>
-            {faqs.map((faq, idx) => (
-              <div key={idx} style={{ borderBottom: idx !== faqs.length - 1 ? '1px solid rgba(15, 23, 42, 0.05)' : 'none', paddingBottom: idx !== faqs.length - 1 ? 16 : 0 }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--black)', marginBottom: 6 }}>{faq.q}</h4>
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{faq.a}</p>
-              </div>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 12 }}>
+            {faqs.map((faq, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div 
+                  key={idx} 
+                  style={{ 
+                    borderBottom: idx !== faqs.length - 1 ? '1px solid rgba(15, 23, 42, 0.08)' : 'none', 
+                    paddingBottom: 16,
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setOpenFaq(isOpen ? null : idx)}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--black)', margin: 0, paddingRight: 20 }}>
+                      {faq.q}
+                    </h4>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: isOpen ? 'var(--primary-light)' : 'rgba(15, 23, 42, 0.04)',
+                      color: isOpen ? 'var(--primary)' : 'var(--text-muted)',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <svg 
+                        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                      >
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </div>
+                  </div>
+                  
+                  <div style={{ 
+                    maxHeight: isOpen ? '200px' : '0px', 
+                    overflow: 'hidden', 
+                    transition: 'max-height 0.3s ease',
+                    opacity: isOpen ? 1 : 0
+                  }}>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
+                      {faq.a}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
