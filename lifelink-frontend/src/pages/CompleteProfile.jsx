@@ -232,8 +232,13 @@ export default function CompleteProfile() {
               <input
                 className="form-input"
                 type="text"
-                value={location.city + (location.pincode ? ` (${location.pincode})` : '')}
-                disabled
+                placeholder="e.g. Pune, Mumbai"
+                defaultValue={location.city !== 'Your Location' ? location.city : ''}
+                id="city-manual-input"
+                onChange={(e) => {
+                  // We don't strictly need to update state on every keystroke if we grab it on submit
+                  // but for controlled input we would need state. 
+                }}
               />
               <button 
                 type="button" 
@@ -241,6 +246,7 @@ export default function CompleteProfile() {
                 onClick={async () => {
                   try {
                     await requestGPS();
+                    document.getElementById('city-manual-input').value = 'Your Location';
                   } catch (e) {
                     console.error("GPS Error", e);
                   }
