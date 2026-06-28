@@ -1,4 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="8" fill="#DC2626"/>
-  <path d="M16 8c-1.5 2.5-4 4.5-4 7.5a4 4 0 108 0c0-3-2.5-5-4-7.5z" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Rounded red background -->
+  <rect width="32" height="32" rx="8" fill="#E63946"/>
+
+  <!-- White blood drop -->
+  <path
+    d="M16 7
+       C16 7 10.5 13 10.5 17
+       A5.5 5.5 0 0 0 21.5 17
+       C21.5 13 16 7 16 7Z"
+    fill="white"/>
+
+  <!-- Heartbeat line -->
+  <path
+    d="M11.5 17
+       H14
+       L15.2 14
+       L16.8 20
+       L18 17
+       H20.5"
+    stroke="#E63946"
+    stroke-width="1.3"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
 </svg>
