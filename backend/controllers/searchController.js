@@ -1,5 +1,6 @@
 const asyncHandler = require("express-async-handler");
 const User = require("../models/User");
+const Donor = require("../models/Donor");
 
 // @desc    Find nearby available donors
 // @route   GET /api/search/nearby

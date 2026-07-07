@@ -79,6 +79,31 @@ const userSchema = new mongoose.Schema({
   fcmToken: {
     type: String,
     default: ""
+  },
+
+  resetPasswordOTP: {
+    type: String,
+    default: null
+  },
+
+  resetPasswordExpires: {
+    type: Date,
+    default: null
+  },
+
+  loginAttempts: {
+    type: Number,
+    default: 0
+  },
+
+  lockUntil: {
+    type: Date,
+    default: null
+  },
+
+  passwordChangedAt: {
+    type: Date,
+    default: null
   }
 }, { timestamps: true });
 

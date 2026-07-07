@@ -5,12 +5,14 @@ import DonorCard from '../components/ui/DonorCard';
 import ContactModal from '../components/ui/ContactModal';
 import DNABackground from '../components/ui/DNABackground';
 import { useLocation } from '../context/LocationContext';
+import { useAuth } from '../context/AuthContext';
 import { BLOOD_GROUPS, ORGANS } from '../utils/helpers';
 import api from '../api/axios';
 import '../components/layout/Landing.css';
 
 export default function Landing() {
   const { location, requestGPS, setPincode, loading: locLoading } = useLocation();
+  const { isAuthenticated } = useAuth();
   const [query, setQuery] = useState('');
   const [pincodeVal, setPincodeVal] = useState('');
   const [results, setResults] = useState(null);
@@ -163,8 +165,14 @@ export default function Landing() {
         </div>
 
         <div className="landing-cta">
-          <Link to="/signup" className="btn btn-glass">Register</Link>
-          <Link to="/login" className="btn btn-primary">Login</Link>
+          {isAuthenticated ? (
+            <Link to="/dashboard" className="btn btn-primary">Go to Dashboard</Link>
+          ) : (
+            <>
+              <Link to="/signup" className="btn btn-glass">Register</Link>
+              <Link to="/login" className="btn btn-primary">Login</Link>
+            </>
+          )}
         </div>
 
         {results && (

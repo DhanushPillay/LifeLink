@@ -41,17 +41,19 @@ export default function Settings() {
     );
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    updateProfile({
+    const result = await updateProfile({
       name,
       bloodGroup,
       donateBlood,
       donateOrgan,
       organs: selectedOrgans,
     });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (result.success) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   };
 
   const handleSaveLocation = (e) => {

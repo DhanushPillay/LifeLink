@@ -7,6 +7,11 @@ const bcrypt = require("bcryptjs");
 const dotenv = require("dotenv");
 dotenv.config();
 
+if (process.env.NODE_ENV === 'production') {
+  console.error('Seed script cannot run in production');
+  process.exit(1);
+}
+
 const User = require("./models/User");
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/lifelink";

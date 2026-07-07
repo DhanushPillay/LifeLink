@@ -29,14 +29,19 @@ export function SocketProvider({ children }) {
       esRef.current = null;
     }
 
+    // Get fresh token from localStorage for reconnection
+    const freshToken = localStorage.getItem(TOKEN_KEY);
+    if (!freshToken) return;
+
     const serverUrl =
       import.meta.env.VITE_API_URL ||
       (import.meta.env.DEV
         ? 'http://localhost:5000'
         : 'https://blood-and-organ-donar-matching-system.onrender.com');
 
-    const url = `${serverUrl}/api/stream?token=${encodeURIComponent(token)}`;
-    console.log('[SSE] Connecting to', url);
+    const url = `${serverUrl}/api/stream?token=${encodeURIComponent(freshToken)}`;
+    // SECURITY: Don't log the full URL as it contains the token
+    console.log('[SSE] Connecting to server');
 
     const es = new EventSource(url);
     esRef.current = es;

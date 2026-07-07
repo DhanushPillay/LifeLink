@@ -22,6 +22,7 @@ export default function CompleteProfile() {
   const [donateOrgan, setDonateOrgan] = useState(false);
   const [selectedOrgans, setSelectedOrgans] = useState([]);
   const [error, setError] = useState('');
+  const [manualCity, setManualCity] = useState('');
 
   const [eligibilityFile, setEligibilityFile] = useState('');
   const [eligibilityFileName, setEligibilityFileName] = useState('');
@@ -110,6 +111,12 @@ export default function CompleteProfile() {
       return;
     }
 
+    // Use manual city if provided, otherwise use GPS location
+    const finalCity = manualCity || location.city;
+    const finalLat = manualCity ? undefined : location.lat;
+    const finalLng = manualCity ? undefined : location.lng;
+    const finalPincode = manualCity ? undefined : location.pincode;
+
     const result = await completeProfile({
       name: name.trim(),
       dob,
@@ -127,10 +134,10 @@ export default function CompleteProfile() {
       eligibilityFileName,
       eligibilityFileType,
       eligibilityStatus: eligibilityFileName ? 'processing' : 'none',
-      lat: location.lat,
-      lng: location.lng,
-      city: location.city,
-      pincode: location.pincode,
+      lat: finalLat,
+      lng: finalLng,
+      city: finalCity,
+      pincode: finalPincode,
     });
     if (!result.success) {
       setError(result.error);
@@ -233,12 +240,9 @@ export default function CompleteProfile() {
                 className="form-input"
                 type="text"
                 placeholder="e.g. Pune, Mumbai"
-                defaultValue={location.city !== 'Your Location' ? location.city : ''}
+                value={manualCity}
+                onChange={(e) => setManualCity(e.target.value)}
                 id="city-manual-input"
-                onChange={(e) => {
-                  // We don't strictly need to update state on every keystroke if we grab it on submit
-                  // but for controlled input we would need state. 
-                }}
               />
               <button 
                 type="button" 
@@ -246,7 +250,7 @@ export default function CompleteProfile() {
                 onClick={async () => {
                   try {
                     await requestGPS();
-                    document.getElementById('city-manual-input').value = 'Your Location';
+                    setManualCity('Your Location');
                   } catch (e) {
                     console.error("GPS Error", e);
                   }

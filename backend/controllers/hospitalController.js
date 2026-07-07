@@ -1,19 +1,30 @@
 const asyncHandler = require("express-async-handler");
 const Hospital = require("../models/Hospital");
 
+const ALLOWED_FIELDS = ["hospitalName", "email", "phone", "city", "address", "location"];
+
+function pickAllowedFields(body, allowedFields) {
+  const filtered = {};
+  for (const field of allowedFields) {
+    if (body[field] !== undefined) {
+      filtered[field] = body[field];
+    }
+  }
+  return filtered;
+}
+
 // @desc    Register a hospital profile
 // @route   POST /api/hospitals
 // @access  Private (Hospital only)
 const registerHospital = asyncHandler(async (req, res) => {
-  req.body.user = req.user._id;
-
   const existingHospital = await Hospital.findOne({ user: req.user._id });
   if (existingHospital) {
     res.status(400);
     throw new Error("User already has a hospital profile");
   }
 
-  const hospital = await Hospital.create(req.body);
+  const hospitalData = { ...pickAllowedFields(req.body, ALLOWED_FIELDS), user: req.user._id };
+  const hospital = await Hospital.create(hospitalData);
   res.status(201).json(hospital);
 });
 

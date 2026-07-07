@@ -114,6 +114,19 @@ const sendMessage = asyncHandler(async (req, res) => {
     throw new Error("Message text is required");
   }
 
+  // Verify receiver exists
+  const receiver = await User.findById(receiverId);
+  if (!receiver) {
+    res.status(404);
+    throw new Error("Receiver not found");
+  }
+
+  // Check if sender is blocked by receiver
+  if (receiver.blockedIds && receiver.blockedIds.includes(senderId.toString())) {
+    res.status(403);
+    throw new Error("Cannot send message to this user");
+  }
+
   const msg = await Message.create({
     sender: senderId,
     receiver: receiverId,
