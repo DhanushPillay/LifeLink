@@ -1,59 +1,48 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import api from '../api/axios';
+import api, { fetchCsrfToken } from '../api/axios';
 import { requestFCMPermission, onForegroundMessage } from '../firebase';
 
 const AuthContext = createContext(null);
 
-const TOKEN_KEY = 'lifelink_token';
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [callLogs, setCallLogs] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [blockedIds, setBlockedIds] = useState([]);
 
+  // Check authentication on mount by calling /auth/me
   useEffect(() => {
-    if (token) {
-      localStorage.setItem(TOKEN_KEY, token);
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-    }
-  }, [token]);
+    const initAuth = async () => {
+      await fetchCsrfToken();
+      
+      const checkAuth = async () => {
+        try {
+          const { data } = await api.get('/auth/me');
+          const userData = data.user || data;
+          setUser(userData);
+          setToken('cookie-auth');
+          setBlockedIds(userData.blockedIds || []);
 
-  // Fetch profile, notifications, and call logs on load
-  useEffect(() => {
-    const fetchAll = async () => {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const { data } = await api.get('/auth/me');
-        const userData = data.user || data;
-        setUser(userData);
-        setBlockedIds(userData.blockedIds || []);
-
-        const [notifsRes, callsRes] = await Promise.all([
-          api.get('/notifications').catch(() => ({ data: [] })),
-          api.get('/calls').catch(() => ({ data: [] })),
-        ]);
-        setNotifications(notifsRes.data || []);
-        setCallLogs(callsRes.data || []);
-      } catch (err) {
-        console.error('Error fetching profile:', err);
-        if (err.response?.status === 401) {
-          setToken(null);
+          const [notifsRes, callsRes] = await Promise.all([
+            api.get('/notifications').catch(() => ({ data: [] })),
+            api.get('/calls').catch(() => ({ data: [] })),
+          ]);
+          setNotifications(notifsRes.data || []);
+          setCallLogs(callsRes.data || []);
+        } catch (err) {
           setUser(null);
+          setToken(null);
+        } finally {
+          setLoading(false);
         }
-      } finally {
-        setLoading(false);
-      }
+      };
+      checkAuth();
     };
-    fetchAll();
-  }, [token]);
+    initAuth();
+  }, []);
 
   // ── FCM: Initialize on login ───────────────────────
   useEffect(() => {
@@ -129,7 +118,8 @@ export function AuthProvider({ children }) {
     setCallLogs([]);
     setNotifications([]);
     setBlockedIds([]);
-    localStorage.removeItem(TOKEN_KEY);
+    // Clear httpOnly cookie via API call
+    api.post('/auth/logout').catch(() => {});
   }, []);
 
   // ── Auth: Reset Password ───────────────────────────
@@ -243,14 +233,22 @@ export function AuthProvider({ children }) {
 
   // ── Notifications (backend API) ────────────────────
   const addNotification = useCallback(async (notif) => {
-    // Notifications are created server-side; this is for optimistic local display
-    const entry = {
-      _id: `n_${Date.now()}`,
-      read: false,
-      createdAt: new Date().toISOString(),
-      ...notif,
-    };
-    setNotifications((prev) => [entry, ...prev]);
+    // Check for duplicate by _id if provided
+    if (notif._id) {
+      setNotifications((prev) => {
+        if (prev.some(n => n._id === notif._id)) return prev;
+        return [{ ...notif, read: false, createdAt: notif.createdAt || new Date().toISOString() }, ...prev];
+      });
+    } else {
+      // For notifications without _id (local only)
+      const entry = {
+        _id: `n_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        read: false,
+        createdAt: new Date().toISOString(),
+        ...notif,
+      };
+      setNotifications((prev) => [entry, ...prev]);
+    }
   }, []);
 
   const markNotificationRead = useCallback(async (id) => {
