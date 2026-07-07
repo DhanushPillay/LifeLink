@@ -9,7 +9,11 @@ function initSSE(app) {
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
     
-    // Support token from query string
+    // SECURITY NOTE: Token is passed via query string because SSE doesn't support
+    // custom headers on initial request. In production, consider using:
+    // 1. Short-lived tokens (5-10 minutes) that are exchanged for longer sessions
+    // 2. Token in cookie with Secure and HttpOnly flags
+    // 3. Rate limiting on the SSE endpoint
     const token = req.query.token;
     if (!token) {
       res.status(401).end("Authentication required");
