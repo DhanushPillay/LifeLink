@@ -1,4 +1,4 @@
-FROM node:24-slim
+FROM node:24-slim AS builder
 
 WORKDIR /app
 
@@ -8,6 +8,12 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 5173
+RUN npm run build
 
-CMD ["npm", "run", "dev", "--", "--host"]
+FROM nginx:alpine
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
