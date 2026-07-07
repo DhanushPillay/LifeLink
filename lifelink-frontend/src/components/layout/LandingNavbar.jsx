@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import './Landing.css';
 
 export default function LandingNavbar() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   return (
     <nav className="landing-nav glass-strong">
       <div className="landing-nav-inner">
@@ -37,8 +37,17 @@ export default function LandingNavbar() {
         </div>
 
         <div className="landing-nav-auth">
-          <Link to="/login" className="btn btn-outline btn-sm">Login</Link>
-          <Link to="/signup" className="btn btn-primary btn-sm">Register</Link>
+          {isAuthenticated ? (
+            <>
+              <Link to="/dashboard" className="btn btn-primary btn-sm">Dashboard</Link>
+              <button onClick={logout} className="btn btn-outline btn-sm">Logout</button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="btn btn-outline btn-sm">Login</Link>
+              <Link to="/signup" className="btn btn-primary btn-sm">Register</Link>
+            </>
+          )}
         </div>
       </div>
     </nav>

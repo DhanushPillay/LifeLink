@@ -27,10 +27,9 @@ function ProtectedRoute({ children }) {
 
 function PublicOnlyRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
-  const [initialAuth] = useState(isAuthenticated);
 
   if (loading) return null;
-  if (initialAuth) return <Navigate to="/dashboard" replace />;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return children;
 }
 
