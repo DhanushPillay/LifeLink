@@ -1,19 +1,31 @@
 const asyncHandler = require("express-async-handler");
 const Donor = require("../models/Donor");
 
+const ALLOWED_CREATE_FIELDS = ["bloodGroup", "donorType", "organType", "city", "phone", "location"];
+const ALLOWED_UPDATE_FIELDS = [...ALLOWED_CREATE_FIELDS, "available"];
+
+function pickAllowedFields(body, allowedFields) {
+  const filtered = {};
+  for (const field of allowedFields) {
+    if (body[field] !== undefined) {
+      filtered[field] = body[field];
+    }
+  }
+  return filtered;
+}
+
 // @desc    Register a donor profile
 // @route   POST /api/donors
 // @access  Private (Donor only)
 const registerDonor = asyncHandler(async (req, res) => {
-  req.body.user = req.user._id;
-
   const existingDonor = await Donor.findOne({ user: req.user._id });
   if (existingDonor) {
     res.status(400);
     throw new Error("User already has a donor profile");
   }
 
-  const donor = await Donor.create(req.body);
+  const donorData = { ...pickAllowedFields(req.body, ALLOWED_CREATE_FIELDS), user: req.user._id };
+  const donor = await Donor.create(donorData);
   res.status(201).json(donor);
 });
 
@@ -21,8 +33,25 @@ const registerDonor = asyncHandler(async (req, res) => {
 // @route   GET /api/donors
 // @access  Private
 const getDonors = asyncHandler(async (req, res) => {
-  const donors = await Donor.find().populate("user", "email");
-  res.json(donors);
+  const { page = 1, limit = 20 } = req.query;
+  const skip = (page - 1) * limit;
+  
+  const donors = await Donor.find()
+    .populate("user", "email")
+    .skip(skip)
+    .limit(parseInt(limit));
+  
+  const total = await Donor.countDocuments();
+  
+  res.json({
+    donors,
+    pagination: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  });
 });
 
 // @desc    Get donors by blood group
@@ -58,9 +87,11 @@ const updateDonor = asyncHandler(async (req, res) => {
     throw new Error("Donor profile not found");
   }
 
+  const allowedData = pickAllowedFields(req.body, ALLOWED_UPDATE_FIELDS);
+
   donor = await Donor.findOneAndUpdate(
     { user: req.user._id },
-    req.body,
+    allowedData,
     { new: true, runValidators: true }
   );
 
