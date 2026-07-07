@@ -7,6 +7,7 @@ const Notification = require("../models/Notification");
 const sendEmail = require("../utils/sendEmail");
 const { isUserOnline, emitToUser, emitToAll } = require("../sse");
 const { sendPushNotification } = require("../utils/push");
+const logger = require("../utils/logger");
 
 // @desc    Create a new donation request
 // @route   POST /api/requests
@@ -34,6 +35,7 @@ const createRequest = asyncHandler(async (req, res) => {
   });
 
   // --- AUTOMATED MATCHING ALGORITHM ---
+  // Search both Donor collection and User.profile for matching donors
   const matchCriteria = {
     donorType: requestType,
     city: request.city,
@@ -46,8 +48,28 @@ const createRequest = asyncHandler(async (req, res) => {
     matchCriteria.organType = organType;
   }
 
+  // Search Donor collection first (registered donors)
   const matchedDonor = await Donor.findOne(matchCriteria).populate("user", "email");
 
+  // Also search User.profile for profile-based donors
+  const userMatchQuery = {
+    profileComplete: true,
+    "profile.eligibilityStatus": "verified",
+    "profile.lat": { $exists: true },
+    "profile.lng": { $exists: true },
+  };
+
+  if (requestType === "blood") {
+    userMatchQuery["profile.bloodGroup"] = bloodGroup;
+    userMatchQuery["profile.donateBlood"] = true;
+  } else if (requestType === "organ") {
+    userMatchQuery["profile.donateOrgan"] = true;
+    userMatchQuery["profile.organs"] = { $in: [organType] };
+  }
+
+  const matchingUsers = await User.find(userMatchQuery).select("_id email");
+
+  // Notify matched donor from Donor collection
   if (matchedDonor) {
     request.status = "Matched";
     request.matchedDonor = matchedDonor._id;
@@ -99,22 +121,30 @@ const createRequest = asyncHandler(async (req, res) => {
             });
           }
         } catch (err) {
-          console.error("Match notification error: ", err);
+          logger.error("Match notification error: ", err);
         }
       })();
     }
-  } else if (isEmergency) {
+  } else if (isEmergency || matchingUsers.length > 0) {
+    // Notify matching users from User.profile (if no Donor match found or emergency)
     const emergencyDonors = await Donor.find({ city: request.city, available: true }).populate("user", "email");
     
+    // Combine emergency donors with matching users (avoid duplicates)
+    const notifiedUserIds = new Set();
+    
+    // Notify Donor collection matches
     for (const d of emergencyDonors) {
       if (d.user) {
+        notifiedUserIds.add(d.user._id.toString());
         (async () => {
           try {
             const notification = await Notification.create({
               user: d.user._id,
-              title: "EMERGENCY in your city!",
-              message: `${hospitalProfile.hospitalName} is in critical need of ${bloodGroup || organType}.`,
-              type: "emergency"
+              title: isEmergency ? "EMERGENCY in your city!" : "New Donation Request",
+              message: isEmergency 
+                ? `${hospitalProfile.hospitalName} is in critical need of ${bloodGroup || organType}.`
+                : `A ${requestType} donation request${bloodGroup ? ` for ${bloodGroup}` : ""}${organType ? ` (${organType})` : ""} has been posted in ${request.city}.`,
+              type: isEmergency ? "emergency" : "match"
             });
 
             emitToUser(d.user._id.toString(), "new-notification", {
@@ -145,15 +175,76 @@ const createRequest = asyncHandler(async (req, res) => {
             if (d.user.email) {
               await sendEmail({
                 email: d.user.email,
-                subject: "EMERGENCY ALERT: Immediate Donation Needed in Your City!",
-                message: `URGENT: ${hospitalProfile.hospitalName} in ${request.city} is in critical need of ${bloodGroup || organType}. If you are able to help, please contact them immediately at ${hospitalProfile.phone || hospitalProfile.email}.`
+                subject: isEmergency 
+                  ? "EMERGENCY ALERT: Immediate Donation Needed in Your City!"
+                  : `New ${requestType} donation request in ${request.city}`,
+                message: isEmergency
+                  ? `URGENT: ${hospitalProfile.hospitalName} in ${request.city} is in critical need of ${bloodGroup || organType}. If you are able to help, please contact them immediately at ${hospitalProfile.phone || hospitalProfile.email}.`
+                  : `A ${requestType} donation request has been posted in ${request.city}. Log in to LIFELINK to view details and respond.`
               });
             }
           } catch (err) {
-            console.error("Emergency notification error: ", err);
+            logger.error("Emergency notification error: ", err);
           }
         })();
       }
+    }
+    
+    // Notify User.profile matches (that weren't already notified via Donor collection)
+    for (const matchedUser of matchingUsers) {
+      if (notifiedUserIds.has(matchedUser._id.toString())) continue;
+      
+      (async () => {
+        try {
+          const notification = await Notification.create({
+            user: matchedUser._id,
+            title: isEmergency ? "EMERGENCY in your city!" : "New Donation Request",
+            message: isEmergency
+              ? `${hospitalProfile.hospitalName} is in critical need of ${bloodGroup || organType}.`
+              : `A ${requestType} donation request${bloodGroup ? ` for ${bloodGroup}` : ""}${organType ? ` (${organType})` : ""} has been posted in ${request.city}.`,
+            type: isEmergency ? "emergency" : "match"
+          });
+
+          emitToUser(matchedUser._id.toString(), "new-notification", {
+            _id: notification._id,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+            read: false,
+            createdAt: notification.createdAt,
+          });
+
+          if (!isUserOnline(matchedUser._id.toString())) {
+            const user = await User.findById(matchedUser._id).select("fcmToken");
+            if (user?.fcmToken) {
+              const result = await sendPushNotification(
+                user.fcmToken,
+                notification.title,
+                notification.message,
+                { redirect: "/dashboard" }
+              );
+              if (result === "invalid") {
+                user.fcmToken = "";
+                await user.save();
+              }
+            }
+          }
+
+          if (matchedUser.email) {
+            await sendEmail({
+              email: matchedUser.email,
+              subject: isEmergency 
+                ? "EMERGENCY ALERT: Immediate Donation Needed in Your City!"
+                : `New ${requestType} donation request in ${request.city}`,
+              message: isEmergency
+                ? `URGENT: ${hospitalProfile.hospitalName} in ${request.city} is in critical need of ${bloodGroup || organType}. If you are able to help, please contact them immediately at ${hospitalProfile.phone || hospitalProfile.email}.`
+                : `A ${requestType} donation request has been posted in ${request.city}. Log in to LIFELINK to view details and respond.`
+            });
+          }
+        } catch (err) {
+          logger.error("User match notification error: ", err);
+        }
+      })();
     }
   }
 
@@ -195,9 +286,17 @@ const updateRequest = asyncHandler(async (req, res) => {
     throw new Error("Not authorized to update this request");
   }
 
+  const ALLOWED_UPDATE_FIELDS = ["status"];
+  const allowedData = {};
+  for (const field of ALLOWED_UPDATE_FIELDS) {
+    if (req.body[field] !== undefined) {
+      allowedData[field] = req.body[field];
+    }
+  }
+
   const updatedRequest = await Request.findByIdAndUpdate(
     req.params.id,
-    req.body,
+    allowedData,
     { new: true, runValidators: true }
   )
     .populate("hospital", "hospitalName")
@@ -298,7 +397,7 @@ const createDonorRequest = asyncHandler(async (req, res) => {
           });
         }
       } catch (e) {
-        console.error("Donor match notification error: ", e);
+        logger.error("Donor match notification error: ", e);
       }
     })();
   }
