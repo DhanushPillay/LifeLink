@@ -1,0 +1,10 @@
+version: 2
+
+secret:
+  incident_rules:
+    - name: docker-compose environment variable references
+      description: "False positive - using environment variable references, not actual passwords"
+      match:
+        - file: docker-compose.yml
+          pattern: "MONGO_PASSWORD|MONGO_USERNAME"
+      incident: false
