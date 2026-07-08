@@ -13,8 +13,8 @@ RUN npm install
 # Copy application code
 COPY . .
 
-# Set ownership to non-root user
-RUN chown -R appuser:appuser /app
+# Create logs directory and set ownership
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
