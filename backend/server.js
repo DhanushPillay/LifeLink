@@ -24,7 +24,10 @@ const app = express();
 
 app.set('trust proxy', process.env.TRUST_PROXY || 1);
 
-app.use(helmet());
+// Security HTTP headers
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+}));
 
 app.use((req, res, next) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
