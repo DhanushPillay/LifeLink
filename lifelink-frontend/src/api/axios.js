@@ -29,7 +29,7 @@ api.interceptors.request.use((config) => {
   }
 
   const unsafeMethods = ['post', 'put', 'patch', 'delete'];
-  if (unsafeMethods.includes(config.method.toLowerCase()) && csrfToken) {
+  if (config.method && unsafeMethods.includes(config.method.toLowerCase()) && csrfToken) {
     config.headers['X-CSRF-Token'] = csrfToken;
   }
   return config;

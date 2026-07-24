@@ -30,7 +30,7 @@ export function SocketProvider({ children }) {
     }
 
     // Get fresh token from localStorage for reconnection
-    const freshToken = localStorage.getItem(TOKEN_KEY);
+    const freshToken = localStorage.getItem('lifelink_token');
     if (!freshToken) return;
 
     const serverUrl =
