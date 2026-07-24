@@ -1,0 +1,5 @@
+- Express app entrypoint: `backend/server.js`.
+- API routes mounted under `/api` with auth at `/api/auth`.
+- Auth controller handles login, register, reset password, Google auth, profile, block/unblock, and FCM token save.
+- JWT secret and Mongo URI are required at startup; server exits if missing.
+- Identifier-based auth should treat email/phone input robustly (trim and normalize before lookup).

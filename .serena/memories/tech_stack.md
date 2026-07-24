@@ -1,0 +1,4 @@
+- Frontend: React 19, Vite, React Router, Axios, @react-oauth/google, Firebase, plain CSS.
+- Backend: Node.js, Express 4, MongoDB/Mongoose, bcryptjs, jsonwebtoken, Joi, cors, helmet, express-rate-limit.
+- Local dev ports assumed by code: frontend `5173`, backend `5000`.
+- Docker Compose is present at repo root and maps frontend/backend/mongo services.

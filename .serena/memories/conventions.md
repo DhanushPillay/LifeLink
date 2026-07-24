@@ -1,0 +1,4 @@
+- Keep auth payloads consistent across frontend/backend: login and reset use `identifier`, registration uses `email` + `phone` + `password`.
+- Frontend auth state is centralized in `AuthContext`; route protection in `App.jsx` should key off `useAuth()` rather than duplicating token checks.
+- Backend route handlers use async handlers plus Joi validation, with errors passed through `errorMiddleware`.
+- Mongoose user emails are normalized to lowercase in the schema; login lookups should normalize user input accordingly.

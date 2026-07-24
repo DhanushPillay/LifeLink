@@ -1,0 +1,6 @@
+- Frontend dev: `cd lifelink-frontend && npm run dev`.
+- Frontend build: `cd lifelink-frontend && npm run build`.
+- Frontend lint: `cd lifelink-frontend && npm run lint`.
+- Backend dev: `cd backend && npm run dev`.
+- Backend start: `cd backend && npm start`.
+- Windows PowerShell path quoting is needed for directories with spaces, e.g. `cd "E:\Personal Projects\IEEE project\BLood"`.

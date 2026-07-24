@@ -1,0 +1,3 @@
+- Frontend change: run `cd lifelink-frontend && npm run build` and `cd lifelink-frontend && npm run lint`.
+- Backend change touching request/response logic: run `node --check backend/controllers/authController.js` or the relevant file, then start the backend if environment variables are available.
+- For auth flow changes, verify the exact API route in `backend/routes/authRoutes.js` and client call in `lifelink-frontend/src/context/AuthContext.jsx`.

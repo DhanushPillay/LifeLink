@@ -1,0 +1,4 @@
+- App entrypoint: `lifelink-frontend/src/main.jsx`; routes and providers are composed in `src/App.jsx`.
+- `AuthContext` owns auth token/user state plus notifications and call logs.
+- Axios wrapper in `src/api/axios.js` injects `Authorization: Bearer <token>` from localStorage.
+- Login page lives in `src/pages/Login.jsx`; dashboard access is controlled by route guards in `src/App.jsx`.

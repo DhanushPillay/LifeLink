@@ -1,0 +1,281 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=0.6in]{geometry}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{multicol}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+
+\hypersetup{colorlinks=true, linkcolor=blue}
+
+\definecolor{p}{RGB}{225,29,72}
+\definecolor{s}{RGB}{13,148,136}
+\definecolor{a}{RGB}{245,158,11}
+\definecolor{d}{RGB}{15,23,42}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textbf{LifeLink} --- Viva Cheat Sheet}
+\fancyfoot[C]{\thepage}
+
+\titleformat{\section}{\large\bfseries\color{d}}{}{0em}{}[\color{p}\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries\color{d}}{}{0em}{}
+
+\setlist[itemize]{leftmargin=*, nosep, topsep=0pt}
+\setlist[enumerate]{leftmargin=*, nosep, topsep=0pt}
+\setlength{\parskip}{2pt}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{What is LifeLink?}
+% ══════════════════════════════════════════════════════════════════════════
+
+A \textbf{web-based blood and organ donor matching platform} that connects donors, hospitals, and patients during medical emergencies. Users search by blood group/location, get matched with available donors, and communicate via chat or masked calling.
+
+\textbf{One-liner:} ``Search engine for saving lives --- find blood/organ donors near you in seconds.''
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Tech Stack}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\textbf{Frontend} & React 19, Vite, React Router v7, Axios, Custom CSS (Glassmorphism) \\
+\textbf{Backend} & Node.js, Express.js, Joi (validation) \\
+\textbf{Database} & MongoDB, Mongoose \\
+\textbf{Auth} & JWT (30-day), bcrypt (10 rounds), Google OAuth \\
+\textbf{Real-Time} & Server-Sent Events (SSE) \\
+\textbf{Push} & Firebase Cloud Messaging (FCM) \\
+\textbf{Location} & Browser Geolocation API + Nominatim (OpenStreetMap) \\
+\textbf{Security} & Helmet, express-rate-limit (500 req/15min) \\
+\textbf{Deploy} & Docker Compose, Vercel \\
+\end{tabularx}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{MERN Stack Explained}
+% ══════════════════════════════════════════════════════════════════════════
+
+\textbf{M}ongoDB (database) $\rightarrow$ \textbf{E}xpress.js (backend framework) $\rightarrow$ \textbf{R}eact.js (frontend) $\rightarrow$ \textbf{N}ode.js (runtime)
+
+\begin{itemize}
+    \item \textbf{React} --- Component-based UI library. Used for building reusable UI components (DonorCard, Modal, Chat).
+    \item \textbf{Express} --- Minimal Node.js web framework. Handles routes, middleware, API logic.
+    \item \textbf{MongoDB} --- NoSQL document database. Flexible schema for nested user profiles.
+    \item \textbf{Node.js} --- JavaScript runtime. Runs the backend server.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Database --- 7 Collections}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\textbf{User} & email, phone, password, role (donor/hospital/admin), profile (nested), blockedIds, fcmToken \\
+\textbf{Donor} & user ref, bloodGroup, organType, city, location (2dsphere), available \\
+\textbf{Hospital} & user ref, hospitalName, email, phone, city, location, verified \\
+\textbf{Request} & requestType, bloodGroup, organType, hospital ref, matchedDonor ref, status, isEmergency \\
+\textbf{Message} & sender ref, receiver ref, text, read \\
+\textbf{Notification} & user ref, title, message, type, read, redirect \\
+\textbf{CallLog} & user ref, donorId, bloodGroup, age, gender, city, direction \\
+\end{tabularx}
+
+\textbf{Relationships:} User 1:1 Donor, User 1:1 Hospital, Hospital 1:N Request, Donor 1:N Request, User 1:N Message, User 1:N Notification
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Key Algorithms}
+% ══════════════════════════════════════════════════════════════════════════
+
+\subsection{Donor Auto-Matching}
+\begin{enumerate}
+    \item Hospital creates request with bloodGroup/organType + city
+    \item System queries Donor collection: \texttt{donorType + city + available + bloodGroup}
+    \item If match found $\rightarrow$ auto-assign, mark unavailable, notify (SSE + email + push)
+    \item If no match + emergency $\rightarrow$ alert ALL matching donors in that city
+\end{enumerate}
+
+\subsection{Haversine Distance Formula}
+\[
+d = 2R \cdot \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta\phi}{2}\right) + \cos\phi_1 \cdot \cos\phi_2 \cdot \sin^2\left(\frac{\Delta\lambda}{2}\right)}\right)
+\]
+$R = 6371$ km (Earth radius). Used to sort donors by proximity from user's GPS coordinates.
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Real-Time: SSE vs Socket.IO}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{itemize}
+    \item \textbf{SSE (Server-Sent Events)} --- Used for real-time push from server to client
+    \item Client opens \texttt{GET /api/stream?token=xxx} connection
+    \item Server pushes events: \texttt{new-notification}, \texttt{new-request}, \texttt{receive-message}, \texttt{online-users}
+    \item Chat messages sent via REST API (\texttt{POST /api/chat/:id/send})
+    \item Exponential backoff reconnection: 2s, 4s, 8s... max 30s
+    \item Heartbeat every 15s keeps connection alive
+\end{itemize}
+
+\textbf{Why SSE over Socket.IO?} Simpler setup, automatic reconnection, works through proxies, no WebSocket configuration needed.
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Security Layers}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{enumerate}
+    \item \textbf{Rate Limiting} --- 500 req/15min on /api routes
+    \item \textbf{Helmet} --- HTTP security headers (CSP, HSTS, X-Frame-Options)
+    \item \textbf{CORS} --- Whitelist of allowed origins
+    \item \textbf{JWT} --- Bearer token auth, 30-day expiry
+    \item \textbf{Role-based access} --- donor / hospital / admin
+    \item \textbf{Joi validation} --- Schema validation on register, login, reset
+    \item \textbf{bcrypt} --- Password hashing with 10 salt rounds
+\end{enumerate}
+
+\textbf{Privacy:} Donor cards show only age, gender, blood group, weight, city --- NO name/phone/email until user clicks ``Contact Securely.''
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Main Features (Quick List)}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{multicols}{2}
+\begin{itemize}
+    \item Email + Google auth
+    \item JWT token auth
+    \item Profile with medical info
+    \item Blood group search
+    \item Organ type search
+    \item GPS + Pincode location
+    \item Distance sorting (Haversine)
+    \item Auto donor matching
+    \item Emergency alerts
+    \item Real-time chat
+    \item Typing indicators
+    \item Read receipts
+    \item Masked calling
+    \item Call logs
+    \item Notifications (SSE)
+    \item Push notifications (FCM)
+    \item Block/unblock donors
+    \item Account deletion
+    \item Dashboard analytics
+    \item Docker deployment
+\end{itemize}
+\end{multicols}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{How Location Search Works}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{enumerate}
+    \item User opens search page
+    \item Frontend gets lat/lng from Browser Geolocation API OR pincode lookup
+    \item Calls Nominatim reverse geocode to get city name
+    \item Sends \texttt{GET /api/search?type=blood\&query=O+\&lat=18.52\&lng=73.85}
+    \item Backend filters all complete profiles by donateBlood/donateOrgan + query match
+    \item Frontend calculates Haversine distance to each donor
+    \item Sorts results nearest-first
+    \item Displays DonorCards (age, gender, weight, blood group, city, distance)
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Chat System}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{itemize}
+    \item \textbf{Sending:} REST API \texttt{POST /api/chat/:userId/send}
+    \item \textbf{Receiving:} SSE event \texttt{receive-message}
+    \item \textbf{Typing:} REST API \texttt{POST /api/chat/:userId/typing} $\rightarrow$ SSE \texttt{user-typing}
+    \item \textbf{Read receipts:} REST API \texttt{POST /api/chat/:userId/read} $\rightarrow$ SSE \texttt{messages-read}
+    \item \textbf{Conversation list:} Aggregation pipeline on Message collection
+    \item \textbf{Unread count:} Separate aggregation grouped by sender
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Frontend Context Providers}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\textbf{AuthProvider} & User state, login/signup/logout, notifications, call logs, blocked donors, FCM \\
+\textbf{SocketProvider} & SSE connection, online users, reconnection, chat event dispatch \\
+\textbf{LocationProvider} & GPS detection, pincode lookup, current coordinates \\
+\end{tabularx}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Deployment}
+% ══════════════════════════════════════════════════════════════════════════
+
+\textbf{Docker Compose:} 3 containers
+\begin{itemize}
+    \item \textbf{mongodb} --- mongo:latest, port 27017, persistent volume
+    \item \textbf{backend} --- Node.js, port 5000, depends on mongodb
+    \item \textbf{frontend} --- React + Vite, port 5173, depends on backend
+\end{itemize}
+
+\textbf{Production:} Frontend on Vercel, Backend on Render, MongoDB Atlas
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Limitations (Be Honest)}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{itemize}
+    \item OTP is hardcoded (123456) --- no real SMS
+    \item Medical verification checks filename only
+    \item Masked calling is a 2.5s timer simulation
+    \item Certificates stored as base64 (not scalable)
+    \item Pincode table has only 10 cities
+    \item No real SMTP email configured
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Future Enhancements}
+% ══════════════════════════════════════════════════════════════════════════
+
+\begin{multicols}{2}
+\begin{itemize}
+    \item Twilio/MSG91 for real OTP
+    \item WebRTC for actual calling
+    \item AI donor recommendation
+    \item React Native mobile app
+    \item Government health integration
+    \item Multi-language support
+    \item OCR certificate verification
+    \item Video calling
+    \item Global expansion
+    \item Blockchain verification
+\end{itemize}
+\end{multicols}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Quick Q\&A for Viva}
+% ══════════════════════════════════════════════════════════════════════════
+
+\textbf{Q: Why MongoDB over MySQL?}\\
+A: Flexible schema for nested user profiles. No complex joins needed. Geospatial index (2dsphere) for location queries.
+
+\textbf{Q: Why SSE over WebSocket?}\\
+A: Simpler, automatic reconnection, works through HTTP proxies, no special server config. Our use case is server-to-client push (notifications), not bidirectional.
+
+\textbf{Q: How does the Haversine formula work?}\\
+A: Calculates great-circle distance between two lat/lng points on Earth. Uses Earth radius (6371km) and trigonometry. More accurate than Euclidean distance for geographic coordinates.
+
+\textbf{Q: What is glassmorphism?}\\
+A: UI design trend with translucent ``glass'' backgrounds, backdrop blur, subtle borders. Used in our dashboard cards and modals.
+
+\textbf{Q: How is JWT different from session-based auth?}\\
+A: JWT is stateless --- server doesn't store session. Token contains user ID, signed with secret. Every request carries the token. No server-side session store needed.
+
+\textbf{Q: What is role-based access control?}\\
+A: Users have roles (donor, hospital, admin). Certain routes check the role before allowing access. E.g., only hospitals can create requests.
+
+\textbf{Q: What is 2dsphere index?}\\
+A: MongoDB index for geospatial queries. Enables ``find documents within X radius of a point'' queries. Used in Donor and Hospital collections.
+
+\textbf{Q: How does Docker Compose help?}\\
+A: Defines 3 services (mongo, backend, frontend) in one file. Single command starts everything. Volumes for data persistence. Dependencies managed automatically.
+
+\end{document}

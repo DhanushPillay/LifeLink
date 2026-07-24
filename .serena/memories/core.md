@@ -1,0 +1,4 @@
+- App split into `lifelink-frontend/` (Vite + React SPA) and `backend/` (Express + MongoDB API).
+- Frontend auth flows go through `src/context/AuthContext.jsx` and `src/api/axios.js`; route guards live in `src/App.jsx`.
+- Backend API mounts under `/api/*` from `backend/server.js`; auth routes are in `backend/routes/authRoutes.js` and logic in `backend/controllers/authController.js`.
+- Login uses `identifier` + `password`; auth identifiers should be treated as user-entered email/phone strings, not exact raw DB matches.

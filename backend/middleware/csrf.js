@@ -6,7 +6,7 @@ const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   cookieOptions: {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   },
   ignoredMethods: ["GET", "HEAD", "OPTIONS"],
   ignoredPaths: ["/api/auth/refresh"],
