@@ -1,6 +1,6 @@
 const { doubleCsrf } = require("csrf-csrf");
 
-const { generateToken, doubleCsrfProtection } = doubleCsrf({
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => process.env.CSRF_SECRET || process.env.JWT_SECRET,
   cookieName: "csrf-token",
   cookieOptions: {
@@ -12,4 +12,4 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
   ignoredPaths: ["/api/auth/refresh"],
 });
 
-module.exports = { generateCsrfToken: generateToken, doubleCsrfProtection };
+module.exports = { generateCsrfToken, doubleCsrfProtection };

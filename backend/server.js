@@ -69,10 +69,9 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json({ limit: '10kb' }));
 app.use(sanitize);
-app.use(generateCsrfToken);
 
 app.get("/api/csrf-token", (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
+  res.json({ csrfToken: generateCsrfToken(req, res) });
 });
 
 const connectDB = require("./config/db");
