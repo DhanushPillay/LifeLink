@@ -23,7 +23,11 @@ export function AuthProvider({ children }) {
           const { data } = await api.get('/auth/me');
           const userData = data.user || data;
           setUser(userData);
-          setToken('cookie-auth');
+          
+          // Use localStorage token if available, else fallback
+          const localToken = localStorage.getItem('lifelink_token');
+          setToken(localToken || 'cookie-auth');
+          
           setBlockedIds(userData.blockedIds || []);
 
           const [notifsRes, callsRes] = await Promise.all([
@@ -82,6 +86,7 @@ export function AuthProvider({ children }) {
       const userData = data.user || data;
       setUser(userData);
       setToken(data.token);
+      if (data.token) localStorage.setItem('lifelink_token', data.token);
       setBlockedIds(userData.blockedIds || []);
       return { success: true, user: userData };
     } catch (err) {
@@ -96,6 +101,7 @@ export function AuthProvider({ children }) {
       const userData = data.user || data;
       setUser(userData);
       setToken(data.token);
+      if (data.token) localStorage.setItem('lifelink_token', data.token);
       setBlockedIds(userData.blockedIds || []);
 
       const [notifsRes, callsRes] = await Promise.all([
@@ -115,6 +121,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
+    localStorage.removeItem('lifelink_token');
     setCallLogs([]);
     setNotifications([]);
     setBlockedIds([]);
@@ -141,6 +148,7 @@ export function AuthProvider({ children }) {
       const userData = data.user || data;
       setUser(userData);
       setToken(data.token);
+      if (data.token) localStorage.setItem('lifelink_token', data.token);
       setBlockedIds(userData.blockedIds || []);
 
       const [notifsRes, callsRes] = await Promise.all([

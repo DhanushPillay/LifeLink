@@ -23,6 +23,11 @@ export const fetchCsrfToken = async () => {
 };
 
 api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('lifelink_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
   const unsafeMethods = ['post', 'put', 'patch', 'delete'];
   if (unsafeMethods.includes(config.method.toLowerCase()) && csrfToken) {
     config.headers['X-CSRF-Token'] = csrfToken;
