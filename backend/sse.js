@@ -14,7 +14,7 @@ function initSSE(app) {
     // 1. Short-lived tokens (5-10 minutes) that are exchanged for longer sessions
     // 2. Token in cookie with Secure and HttpOnly flags
     // 3. Rate limiting on the SSE endpoint
-    const token = req.query.token;
+    const token = req.cookies?.accessToken || req.query.token;
     if (!token) {
       res.status(401).end("Authentication required");
       return;
