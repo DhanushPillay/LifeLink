@@ -111,4 +111,4 @@ const getDonorById = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { searchNearbyDonors, searchDonors, getDonorById };
+module.exports = { searchDonors, getDonorById };

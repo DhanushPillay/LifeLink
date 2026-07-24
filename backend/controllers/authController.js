@@ -287,7 +287,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     await sendEmail({
       email: user.email,
       subject: "Password Reset OTP",
-      message: `Your OTP for password reset is: ${otp}\n\nThis OTP will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`
+      message: `Your OTP for password reset is: ${otp}\n\nThis OTP will expire in 5 minutes.\n\nIf you did not request this, please ignore this email.`
     });
   }
 

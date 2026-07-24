@@ -81,7 +81,6 @@ export default function ContactModal({ isOpen, onClose, donor, type }) {
         age: donor.age,
         gender: donor.gender,
         city: donor.city,
-        status: 'connected',
       });
       addNotification({
         title: 'Masked Call Connected',
@@ -113,7 +112,6 @@ export default function ContactModal({ isOpen, onClose, donor, type }) {
         age: donor.age,
         gender: donor.gender,
         city: donor.city,
-        status: 'connected',
       });
       addNotification({
         title: 'Masked Call Connected',

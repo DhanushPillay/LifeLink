@@ -13,6 +13,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const User = require("./models/User");
+const Donor = require("./models/Donor");
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/lifelink";
 
@@ -239,7 +240,7 @@ async function seed() {
       continue;
     }
 
-    await User.create({
+    const user = await User.create({
       email: d.email,
       phone: d.phone,
       password: hashedPassword,
@@ -264,6 +265,42 @@ async function seed() {
         pincode: d.loc.pincode,
       },
     });
+
+    // Also create Donor document for Donor-model matching
+    if (d.donateBlood) {
+      await Donor.create({
+        user: user._id,
+        name: d.name,
+        bloodGroup: d.bloodGroup,
+        donorType: "blood",
+        city: d.loc.city,
+        phone: d.phone,
+        location: {
+          type: "Point",
+          coordinates: [d.loc.lng, d.loc.lat],
+        },
+        available: true,
+      });
+    }
+    if (d.donateOrgan) {
+      for (const organ of d.organs) {
+        await Donor.create({
+          user: user._id,
+          name: d.name,
+          bloodGroup: d.bloodGroup,
+          donorType: "organ",
+          organType: organ,
+          city: d.loc.city,
+          phone: d.phone,
+          location: {
+            type: "Point",
+            coordinates: [d.loc.lng, d.loc.lat],
+          },
+          available: true,
+        });
+      }
+    }
+
     console.log(`✅ Created: ${d.name} (${d.bloodGroup}) - ${d.donateBlood ? "Blood" : ""}${d.donateOrgan ? " Organ" : ""}`);
     created++;
   }

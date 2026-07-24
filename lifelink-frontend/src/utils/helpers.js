@@ -33,7 +33,7 @@ export function formatTime(dateStr) {
 }
 
 export function generateOTP() {
-  return '123456';
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export function validateEmail(email) {

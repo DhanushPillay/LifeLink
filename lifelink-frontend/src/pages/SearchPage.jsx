@@ -25,7 +25,7 @@ export default function SearchPage() {
 
   useEffect(() => {
     runSearch('');
-  }, [type, location, blockedIds]);
+  }, [type]);
 
   const runSearch = async (q) => {
     if (abortRef.current) {

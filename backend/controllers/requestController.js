@@ -22,6 +22,19 @@ const createRequest = asyncHandler(async (req, res) => {
 
   const { requestType, bloodGroup, organType, units, city, isEmergency, urgencyLevel } = req.body;
 
+  if (!requestType || !["blood", "organ"].includes(requestType)) {
+    res.status(400);
+    throw new Error("Request type must be 'blood' or 'organ'");
+  }
+  if (requestType === "blood" && !bloodGroup) {
+    res.status(400);
+    throw new Error("Blood group is required for blood requests");
+  }
+  if (requestType === "organ" && !organType) {
+    res.status(400);
+    throw new Error("Organ type is required for organ requests");
+  }
+
   let request = await Request.create({
     requestType,
     bloodGroup,
@@ -31,7 +44,8 @@ const createRequest = asyncHandler(async (req, res) => {
     hospital: hospitalProfile._id,
     status: "Pending",
     isEmergency: isEmergency || false,
-    urgencyLevel: urgencyLevel || "medium"
+    urgencyLevel: urgencyLevel || "medium",
+    requestedBy: req.user._id,
   });
 
   // --- AUTOMATED MATCHING ALGORITHM ---

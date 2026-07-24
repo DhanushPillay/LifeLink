@@ -56,10 +56,15 @@ export default function Settings() {
     }
   };
 
-  const handleSaveLocation = (e) => {
+  const handleSaveLocation = async (e) => {
     e.preventDefault();
     if (pincode.length === 6) {
-      setPincode(pincode);
+      const result = await updateProfile({ pincode });
+      if (result.success) {
+        setPincode(pincode);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
     }
   };
 

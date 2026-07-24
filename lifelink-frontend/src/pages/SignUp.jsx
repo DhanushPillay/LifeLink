@@ -35,8 +35,12 @@ export default function SignUp() {
       setError('Enter a valid 10-digit phone number');
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 12) {
+      setError('Password must be at least 12 characters with uppercase, lowercase, number, and special character (@$!%*?&)');
+      return;
+    }
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(password)) {
+      setError('Password must contain uppercase, lowercase, number, and special character (@$!%*?&)');
       return;
     }
     if (password !== confirmPassword) {
@@ -137,7 +141,7 @@ export default function SignUp() {
             <input
               className="form-input"
               type="password"
-              placeholder="Minimum 6 characters"
+              placeholder="Min 12 chars, uppercase, lowercase, number, special char"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

@@ -36,7 +36,6 @@ export function SocketProvider({ children }) {
         : 'https://blood-and-organ-donar-matching-system.onrender.com');
 
     const url = `${serverUrl}/api/stream`;
-    // SECURITY: Don't log the full URL as it contains the token
     console.log('[SSE] Connecting to server');
 
     const es = new EventSource(url, { withCredentials: true });

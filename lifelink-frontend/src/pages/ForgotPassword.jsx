@@ -1,42 +1,40 @@
-/**
- * @file ForgotPassword.jsx
- * @description Forgot Password page allowing verification code check and credential recovery.
- * @author KrishBansod99
- * @reviewed Reviewed and documented by KrishBansod99 for code maintainability.
- */
-
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { generateOTP } from '../utils/helpers';
+import api from '../api/axios';
 import './Auth.css';
 
 export default function ForgotPassword() {
-  const { resetPassword } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState('identifier');
   const [identifier, setIdentifier] = useState('');
   const [otp, setOtp] = useState('');
-  const [sentOtp, setSentOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSendOTP = (e) => {
+  const handleSendOTP = async (e) => {
     e.preventDefault();
     if (!identifier.trim()) {
       setError('Enter your email or phone number');
       return;
     }
-    setSentOtp(generateOTP());
-    setStep('otp');
+    setLoading(true);
     setError('');
+    try {
+      await api.post('/auth/forgot-password', { identifier: identifier.trim() });
+      setStep('otp');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerifyOTP = (e) => {
     e.preventDefault();
-    if (otp !== sentOtp) {
-      setError('Invalid OTP. Use 123456 for demo.');
+    if (!otp || otp.length !== 6) {
+      setError('Enter the 6-digit OTP sent to your email');
       return;
     }
     setStep('password');
@@ -45,20 +43,28 @@ export default function ForgotPassword() {
 
   const handleReset = async (e) => {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (newPassword.length < 12) {
+      setError('Password must be at least 12 characters with uppercase, lowercase, number, and special character (@$!%*?&)');
+      return;
+    }
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(newPassword)) {
+      setError('Password must contain uppercase, lowercase, number, and special character (@$!%*?&)');
       return;
     }
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    const result = await resetPassword({ identifier, newPassword });
-    if (!result.success) {
-      setError(result.error);
-      return;
+    setLoading(true);
+    setError('');
+    try {
+      await api.post('/auth/reset-password', { identifier: identifier.trim(), otp, newPassword });
+      navigate('/login');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reset password. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    navigate('/login');
   };
 
   return (
@@ -104,7 +110,7 @@ export default function ForgotPassword() {
         <h2>Reset Password</h2>
         <p className="auth-subtitle">
           {step === 'identifier' && 'Enter your email or phone to receive OTP'}
-          {step === 'otp' && 'Enter the OTP sent to your number'}
+          {step === 'otp' && 'Enter the OTP sent to your email'}
           {step === 'password' && 'Create your new password'}
         </p>
 
@@ -122,8 +128,8 @@ export default function ForgotPassword() {
               />
             </div>
             {error && <p className="form-error">{error}</p>}
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }}>
-              Send OTP
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
+              {loading ? 'Sending...' : 'Send OTP'}
             </button>
           </form>
         )}
@@ -141,7 +147,6 @@ export default function ForgotPassword() {
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 required
               />
-              <p className="form-hint">Demo OTP: 123456</p>
             </div>
             {error && <p className="form-error">{error}</p>}
             <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }}>
@@ -157,7 +162,7 @@ export default function ForgotPassword() {
               <input
                 className="form-input"
                 type="password"
-                placeholder="Minimum 6 characters"
+                placeholder="Min 12 chars, uppercase, lowercase, number, special char"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
@@ -175,8 +180,8 @@ export default function ForgotPassword() {
               />
             </div>
             {error && <p className="form-error">{error}</p>}
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }}>
-              Reset Password
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
+              {loading ? 'Resetting...' : 'Reset Password'}
             </button>
           </form>
         )}
