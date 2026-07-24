@@ -71,6 +71,9 @@ app.use(express.json({ limit: '10kb' }));
 app.use(sanitize);
 
 app.get("/api/csrf-token", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   res.json({ csrfToken: generateCsrfToken(req, res) });
 });
 

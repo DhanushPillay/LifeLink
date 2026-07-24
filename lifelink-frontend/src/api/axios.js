@@ -39,8 +39,11 @@ api.interceptors.response.use(
       }
     }
     if (error.response?.status === 403 && error.response?.data?.code === 'invalid_csrf_token') {
-      await fetchCsrfToken();
-      return api(error.config);
+      if (!error.config._retry) {
+        error.config._retry = true;
+        await fetchCsrfToken();
+        return api(error.config);
+      }
     }
     return Promise.reject(error);
   }
